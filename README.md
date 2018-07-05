@@ -12,8 +12,8 @@ RC createPageFile (char *fileName);
 **RETURN**: RC_OK (0) or RC_FILE_CREATION_FAILED (6) or RC_NO_FILENAME (14)
 - Create a page file with name fileName  
 	- The page file created is one page, with PAGE_SIZE defined in dberror.h.  
-	- use `fopen(fileName, "wbx");` (or `fopen(fileName, "w+bx");` if we need to be able to read from the file)  
-		- using the x mode is a C11 standard that fails if the file already exists and opens the file in exclusive mode  
+	- use `fopen(fileName, "wbx");` or `fopen(fileName, "w+bx");` (do we need to be able to read from the file?)  
+		- using the x mode is a C11 standard that fails if the file already exists  
 - Fill the page with nulls (\0)  
 - Close the file  
 - Return a return code (RC) based on the results  
@@ -29,15 +29,31 @@ RC openPageFile (char *fileName, SM_FileHandle *fHandle);
 	- return RC_FILE_NOT_FOUND if the file does not exist  
 - store fileName in fHandle -> fileName  
 - count number of pages and store in fHandle ->totalNumPages  
-- set fHandle -> curPagePos  
-	- Should this be the start or end of the page?  
-- set fHandle -> mgmtInfo? Not sure what this portion of the struct is supposed to be used for. I think we should store the FILE pointer here.  
-- Return the correct return code
+- set `fHandle -> curPagePos  = 0`  
+	- The assignment says "When opening a file, the current page should be the first page in the file (curPagePos=0)"  
+- set fHandle -> mgmtInfo? I think we should store the FILE pointer here.  
+	- The assignment says, "Use the mgmtInfo to store additional information about the file needed by your implementation, e.g., a POSIX file descriptor."  
+- Return the correct return code  
 
 ```c
 RC closePageFile (SM_FileHandle *fHandle);
 ```
 **INPUT**: A file handle struct  
-**RETURN**: RC_OK (0) or RC_FILE_HANDLE_NOT_INIT (2) or RC_FILE_NOT_CLOSED (12)
-- Close the page file using `fclose(fHandle -> mgmtInfo)` (assuming we're storing the FILE pointer in mgmtInfo)
+**RETURN**: RC_OK (0) or RC_FILE_HANDLE_NOT_INIT (2) or RC_FILE_NOT_CLOSED (12)  
+- Close the page file using `fclose(fHandle -> mgmtInfo)` (assuming we are storing the FILE pointer in mgmtInfo)  
+	- fclose() returns 0 if successful  
+- Return the correct RC  
+
+```c
+RC destroyPageFile (char *fileName);
+```
+**INPUT**: String with the file name  
+**RETURN**: RC_OK (0) or RC_FILE_NOT_FOUND (1) or RC_FILE_NOT_CLOSED (12) or RC_NO_FILENAME (14)  
+- Delete the file using `remove(fileName)`  
+	- returns 0 if successful, otherwise nonzero
 - Return the correct RC
+
+###Reading blocks from disc
+```c
+RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage);
+```
