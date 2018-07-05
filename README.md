@@ -1,3 +1,6 @@
+###Self-generated functions
+We should make some functions that check frequently looked for error conditions such as RC_FILE_NOT_FOUND, RC_FILE_HANDLE_NOT_INIT, RC_FILE_NOT_INITIALIZED, RC_NO_FILENAME that we are going to check for frequently so we do not need to duplicate the code each in each of the below functions where we need to check for those conditions.
+
 ###Manipulating page files
 ####Note: Compillation must be performed using the C11 standard
 ```c
@@ -57,3 +60,9 @@ RC destroyPageFile (char *fileName);
 ```c
 RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage);
 ```
+**INPUT**: a page number, a file handle struct, and a struct that points to the area of memory where we are reading the page to  
+**RETURN**: RC_OK (0) or RC_FILE_NOT_FOUND (1) or RC_FILE_HANDLE_NOT_INIT (2) or RC_READ_NON_EXISTING_PAGE (4) or RC_FILE_NOT_INITIALIZED (9) or RC_FILE_OFFSET_FAILED (10) or RC_FILE_READ_FAILED (11)  
+- Check to make sure that the page number is <= fHandle -> totalNumPages
+- offset from (fHandle -> mgmtInfo) by pageNum\*PAGE_SIZE using fseek()
+- Copy that page to memPage either using memcpy or fread
+- return the correct RC
