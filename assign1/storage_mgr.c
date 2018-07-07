@@ -79,17 +79,6 @@ RC destroyPageFile (char *fileName){
     return RC_OK;
 }
 
-
-RC destroyPageFile (char *fileName) {
-    if(!fileName) {
-        return RC_NO_FILENAME;
-    }
-    if(remove(fileName)!=0) {
-        return RC_FILE_NOT_FOUND;
-    }
-    return RC_OK;
-}
-
 /***********************************************************
 *                                                          *
 *              Writing blocks to a page file               *
