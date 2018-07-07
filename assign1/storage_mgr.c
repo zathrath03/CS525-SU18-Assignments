@@ -14,7 +14,7 @@ RC createPageFile(char *fileName){
     if(!fileName){
         return RC_NO_FILENAME;
     }
-    FILE * file_ptr = fopen(fileName, "wb+");
+    FILE * file_ptr = fopen(fileName, "wbx");
     if(!file_ptr){
         return RC_FILE_CREATION_FAILED;
     }
