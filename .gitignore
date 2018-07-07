@@ -1,0 +1,7 @@
+*.cbp
+*.depend
+*.layout
+*.bin
+bin/
+obj/
+main.c
