@@ -48,11 +48,16 @@ testCreateOpenClose(void)
   ASSERT_TRUE((fh.totalNumPages == 1), "expect 1 page in new file");
   ASSERT_TRUE((fh.curPagePos == 0), "freshly opened file's page position should be 0");
 
+  ASSERT_ERROR(strcmp(fh.fileName, TESTPF) != 0, "filename incorrect");
+  ASSERT_ERROR((fh.totalNumPages != 1), "expected 1 page not in new file");
+  ASSERT_ERROR((fh.curPagePos != 0), "expected file page position should have been 0");
+
   TEST_CHECK(closePageFile (&fh));
   TEST_CHECK(destroyPageFile (TESTPF));
 
   // after destruction trying to open the file should cause an error
   ASSERT_TRUE((openPageFile(TESTPF, &fh) != RC_OK), "opening non-existing file should return an error.");
+  ASSERT_ERROR((openPageFile(TESTPF, &fh) == RC_OK), "Opening a non-existing file returns okay, which is an error");
 
   TEST_DONE();
 }
