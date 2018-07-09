@@ -152,7 +152,7 @@ RC appendEmptyBlock (SM_FileHandle *fHandle) {
     if (!fHandle)
         return RC_FILE_HANDLE_NOT_INIT;
     //check that the file the file handle points to exists
-    if (!fHandle->mgmtInfo)
+    if (fHandle->mgmtInfo == ((void*)0))
         return RC_FILE_NOT_INITIALIZED;
     /*moves the write pointer to the end
     //offset from SEEK_SET vice SEEK_END since library implementations
@@ -189,7 +189,7 @@ RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle){
     if (!fHandle)
         return RC_FILE_HANDLE_NOT_INIT;
     //check that the file the file handle points to exists
-    if (!fHandle->mgmtInfo)
+    if (fHandle->mgmtInfo == ((void*)0))
         return RC_FILE_NOT_INITIALIZED;
     //increases the number of pages by appending pages
     while (numberOfPages > fHandle->totalNumPages){
