@@ -2,6 +2,7 @@
 *.depend
 *.layout
 *.bin
+*.o
 bin/
 obj/
 assign1/main.c

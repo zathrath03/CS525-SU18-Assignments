@@ -1,6 +1,6 @@
 #include "storage_mgr.h"
 #include "dberror.h"
-#include <windows.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <math.h>
@@ -64,7 +64,7 @@ RC closePageFile(SM_FileHandle* fHandle){
     }
     //just for safety
     free(fHandle);
-    fHandle = NULL;
+    fHandle = ((void*)0); //NULL
     return RC_OK;
 }
 
@@ -118,6 +118,8 @@ RC writeBlock(int pageNum, SM_FileHandle* fHandle, SM_PageHandle memPage) {
     //moves the write pointer to the correct page
     if (fseek(fHandle->mgmtInfo, pageNum*PAGE_SIZE, SEEK_SET) != 0)
         return RC_FILE_OFFSET_FAILED;
+    //update current page position based on fseek
+    fHandle->curPagePos = pageNum;
     //writes memPage to the file and flushes the stream
     if (fwrite(memPage, PAGE_SIZE, 1, fHandle->mgmtInfo) != 1 || fflush(fHandle -> mgmtInfo) != 0)
         return RC_WRITE_FAILED;
@@ -126,7 +128,7 @@ RC writeBlock(int pageNum, SM_FileHandle* fHandle, SM_PageHandle memPage) {
 }
 
 /***********************************************************
-Write a page to disk relative position
+Write a page to disk using relative position
 fHandle: Struct which contains the FILE *stream destination
          stored in -> mgmtInfo
 memPage: The page in main memory that is to be written to disk.
@@ -166,6 +168,10 @@ RC appendEmptyBlock (SM_FileHandle *fHandle) {
         return RC_WRITE_FAILED;
     //increments the total number of pages in the FileHandle struct
     fHandle->totalNumPages++;
+    //move the write pointer back to the current page
+    if (fseek(fHandle->mgmtInfo, fHandle->curPagePos*PAGE_SIZE, SEEK_SET) != 0)
+        return RC_FILE_OFFSET_FAILED;
+
     return RC_OK;
 }
 
