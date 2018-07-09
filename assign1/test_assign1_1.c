@@ -16,7 +16,9 @@ char *testName;
 /* prototypes for test functions */
 static void testCreateOpenClose(void);
 static void testSinglePageContent(void);
-
+static void testPageInfo(void);
+static void testEnsureCapacity(void);
+static void testAppendEmptyBlock(void);
 /* main function running all tests */
 int
 main (void)
@@ -27,10 +29,28 @@ main (void)
 
   testCreateOpenClose();
   testSinglePageContent();
+  testPageInfo();
+  testEnsureCapacity();
+  testAppendEmptyBlock();
 
   return 0;
 }
+//Test the following:
+/*
+creating a page     (done with all)
+  file name
+  number of pages
+  current page position
+closing a page      (done)
+destroying a page   (done)
 
+test if filehandle points to correct file (done)
+test block size      (not entirely sure if correct)
+test appendEmpty
+test ensureCapacity   (in progress)
+
+test if info written correctly to disk using "read from disk commands"
+*/
 
 /* check a return code. If it is not RC_OK then output a message, error description, and exit */
 /* Try to create, open, and close a page file */
@@ -68,7 +88,7 @@ testSinglePageContent(void)
 {
   SM_FileHandle fh;
   SM_PageHandle ph;
-  int i;
+  //int i;
 
   testName = "test single page content";
 
@@ -99,6 +119,89 @@ testSinglePageContent(void)
 //  printf("reading first block\n");
 
     //close page file before delete
+  TEST_CHECK(closePageFile (&fh));
+  // destroy new page file
+  TEST_CHECK(destroyPageFile (TESTPF));
+
+  TEST_DONE();
+}
+/*****************************************************************************
+          testPageInfo will test the certain steps taken in writeBlock
+******************************************************************************/
+void
+testPageInfo(void)
+{
+  SM_FileHandle fh;
+  SM_PageHandle ph;
+  testName = "test page information methods";
+
+  TEST_CHECK(createPageFile (TESTPF));
+  TEST_CHECK(openPageFile (TESTPF, &fh));
+  TEST_CHECK(writeBlock(0, &fh, ph));
+
+  //test mgmtInfo
+  ASSERT_TRUE((fh.mgmtInfo), "File handle's file is initialized");
+
+  //test block size
+  ASSERT_ERROR((sizeof(PAGE_SIZE) - sizeof(ph) >= 0), "Page Handlers block size will fit in a standard page size");
+
+ /* //check that the memPage can fit in a block
+    if (sizeof(*memPage) > PAGE_SIZE)
+        return RC_INCOMPATIBLE_BLOCKSIZE;
+*/
+  TEST_CHECK(closePageFile (&fh));
+  // destroy new page file
+  TEST_CHECK(destroyPageFile (TESTPF));
+
+  TEST_DONE();
+}
+
+/*****************************************************************************
+    testEnsureCapacity will test the ensureCapacity function
+******************************************************************************/
+void
+testEnsureCapacity(void)
+{
+  SM_FileHandle fh;
+  //SM_PageHandle ph;
+  testName = "test ensureCapacity method";
+
+  TEST_CHECK(createPageFile (TESTPF));
+  TEST_CHECK(openPageFile (TESTPF, &fh));
+  TEST_CHECK(ensureCapacity(4,&fh));
+  //Check to see if the file handle contains the correct number of pages
+  ASSERT_EQUALS_INT(fh.totalNumPages, 4, "Correct number of pages exist");
+  // close new page file
+  TEST_CHECK(closePageFile (&fh));
+  // destroy new page file
+  TEST_CHECK(destroyPageFile (TESTPF));
+
+  TEST_DONE();
+}
+
+/*****************************************************************************
+    testAppendEmptyBlock will test the ensureCapacity function
+******************************************************************************/
+void
+testAppendEmptyBlock(void)
+{
+  SM_FileHandle fh;
+  //SM_PageHandle ph;
+  testName = "test ensureCapacity method";
+
+  TEST_CHECK(createPageFile (TESTPF));
+  TEST_CHECK(openPageFile (TESTPF, &fh));
+
+  //append a page to the new page file
+  TEST_CHECK(appendEmptyBlock(&fh));
+
+  //check if a new page has been appended
+  ASSERT_EQUALS_INT(fh.totalNumPages, 2, "A second page has been appended");
+
+  //check if the new page is empty with null values using READ COMMANDS
+
+
+  // close new page file
   TEST_CHECK(closePageFile (&fh));
   // destroy new page file
   TEST_CHECK(destroyPageFile (TESTPF));
