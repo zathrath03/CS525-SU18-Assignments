@@ -5,7 +5,6 @@
 #include <sys/stat.h>
 #include <math.h>
 
-
 void initStorageManager(){
     return;
 }
@@ -14,7 +13,7 @@ RC createPageFile(char *fileName){
     if(!fileName){
         return RC_NO_FILENAME;
     }
-    FILE * file_ptr = fopen(fileName, "wbx");
+    FILE * file_ptr = fopen(fileName, "wb");
     if(!file_ptr){
         return RC_FILE_CREATION_FAILED;
     }
@@ -74,7 +73,7 @@ RC destroyPageFile (char *fileName){
         return RC_NO_FILENAME;
     }
     if(remove(fileName)!=0){
-        return RC_FILE_NOT_FOUND;
+        return RC_FILE_NOT_CLOSED;
     }
     return RC_OK;
 }
