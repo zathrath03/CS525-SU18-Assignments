@@ -17,13 +17,12 @@ RC createPageFile(char *fileName){
     if(!file_ptr){
         return RC_FILE_CREATION_FAILED;
     }
-    int i;
-    for(i=0;i<PAGE_SIZE;i++){
-        if(fwrite("\0",1,1,file_ptr)<0){
-            return RC_FILE_CREATION_FAILED;
-        }
-    }
-    if(fclose(file_ptr)<0){
+    //creates an array of null elements equal to PAGE_SIZE bytes
+    char buffer[PAGE_SIZE] = {0};
+    //writes the buffer to the file
+    if (fwrite(buffer, PAGE_SIZE, 1, file_ptr) != 1)
+        return RC_WRITE_FAILED;
+    if(fclose(file_ptr) == EOF){
         return RC_FILE_NOT_CLOSED;
     }
     return RC_OK;
@@ -152,7 +151,7 @@ RC appendEmptyBlock (SM_FileHandle *fHandle) {
     if (!fHandle)
         return RC_FILE_HANDLE_NOT_INIT;
     //check that the file the file handle points to exists
-    if (fHandle->mgmtInfo == ((void*)0))
+    if (fHandle->mgmtInfo == ((void*)0)) //NULL
         return RC_FILE_NOT_INITIALIZED;
     /*moves the write pointer to the end
     //offset from SEEK_SET vice SEEK_END since library implementations
