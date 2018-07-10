@@ -19,6 +19,8 @@ static void testSinglePageContent(void);
 static void testPageInfo(void);
 static void testEnsureCapacity(void);
 static void testAppendEmptyBlock(void);
+static void testErrorCases(void);
+
 /* main function running all tests */
 int
 main (void) {
@@ -31,6 +33,7 @@ main (void) {
     testPageInfo();
     testEnsureCapacity();
     testAppendEmptyBlock();
+    testErrorCases();
 
     return 0;
 }
@@ -133,6 +136,8 @@ testPageInfo(void) {
     SM_PageHandle ph;
     testName = "test page information methods";
 
+    ph = (SM_PageHandle) malloc(PAGE_SIZE);
+
     TEST_CHECK(createPageFile (TESTPF));
     TEST_CHECK(openPageFile (TESTPF, &fh));
     TEST_CHECK(writeBlock(0, &fh, ph));
@@ -201,6 +206,50 @@ testAppendEmptyBlock(void) {
     TEST_CHECK(closePageFile (&fh));
     // destroy new page file
     TEST_CHECK(destroyPageFile (TESTPF));
+
+    TEST_DONE();
+}
+
+void
+testErrorCases(void) {
+    SM_FileHandle fh;
+    SM_PageHandle ph = (SM_PageHandle) malloc(PAGE_SIZE);
+    printf("\n\t\tTESTING FUNCTION ARGUMENT ERRORS\n");
+
+    //check RC_NO_FILENAME on invalid fileName
+    ASSERT_TRUE((createPageFile("") == RC_NO_FILENAME), "createPageFile() RC_NO_FILENAME check");
+    ASSERT_TRUE((openPageFile("", &fh) == RC_NO_FILENAME), "openPageFile() RC_NO_FILENAME check");
+    ASSERT_TRUE((destroyPageFile("") == RC_NO_FILENAME), "openPageFile() RC_NO_FILENAME check");
+
+    //check RC_FILE_HANDLE_NOT_INIT on invalid file handle
+    ASSERT_TRUE((closePageFile(&fh) == RC_FILE_HANDLE_NOT_INIT), "closePageFile() RC_FILE_HANDLE_NOT_INIT check");
+    ASSERT_TRUE((writeBlock(0, &fh, ph) == RC_FILE_HANDLE_NOT_INIT), "writeBlock() RC_FILE_HANDLE_NOT_INIT check");
+    ASSERT_TRUE((writeCurrentBlock(&fh, ph) == RC_FILE_HANDLE_NOT_INIT), "writeCurrentBlock() RC_FILE_HANDLE_NOT_INIT check");
+    ASSERT_TRUE((appendEmptyBlock(&fh) == RC_FILE_HANDLE_NOT_INIT), "appendEmptyBlock() RC_FILE_HANDLE_NOT_INIT check");
+    ASSERT_TRUE((ensureCapacity(0, &fh) == RC_FILE_HANDLE_NOT_INIT), "ensureCapacity() RC_FILE_HANDLE_NOT_INIT check");
+    ASSERT_TRUE((readBlock(0, &fh, ph) == RC_FILE_HANDLE_NOT_INIT), "readBlock() RC_FILE_HANDLE_NOT_INIT check");
+    ASSERT_TRUE((getBlockPos(&fh) == RC_FILE_HANDLE_NOT_INIT), "getBlockPos() RC_FILE_HANDLE_NOT_INIT check");
+
+    //check RC_FILE_NOT_INITIALIZED
+    createPageFile(TESTPF);
+    openPageFile(TESTPF, &fh);
+    FILE *temp = fh.mgmtInfo; //store the FILE *stream to be able to restore it later
+    fh.mgmtInfo = ((void*)0); //NULL
+
+    ASSERT_TRUE((closePageFile(&fh) == RC_FILE_NOT_INITIALIZED), "closePageFile() RC_FILE_NOT_INITIALIZED check");
+    ASSERT_TRUE((writeBlock(0, &fh, ph) == RC_FILE_NOT_INITIALIZED), "writeBlock() RC_FILE_NOT_INITIALIZED check");
+    ASSERT_TRUE((writeCurrentBlock(&fh, ph) == RC_FILE_NOT_INITIALIZED), "writeCurrentBlock() RC_FILE_NOT_INITIALIZED check");
+    ASSERT_TRUE((appendEmptyBlock(&fh) == RC_FILE_NOT_INITIALIZED), "appendEmptyBlock() RC_FILE_NOT_INITIALIZED check");
+    ASSERT_TRUE((ensureCapacity(0, &fh) == RC_FILE_NOT_INITIALIZED), "ensureCapacity() RC_FILE_NOT_INITIALIZED check");
+    ASSERT_TRUE((readBlock(0, &fh, ph) == RC_FILE_NOT_INITIALIZED), "readBlock() RC_FILE_NOT_INITIALIZED check");
+
+    fh.mgmtInfo = temp; //restores the original FILE *stream
+
+    //check RC_FILE_NOT_CLOSED
+    ASSERT_TRUE((destroyPageFile(TESTPF) == RC_FILE_NOT_CLOSED), "destroyPageFile() RC_FILE_NOT_CLOSED check");
+
+    closePageFile(&fh);
+    destroyPageFile(TESTPF);
 
     TEST_DONE();
 }
