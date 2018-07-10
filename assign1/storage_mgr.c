@@ -219,7 +219,7 @@ RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
     //moves the write pointer to the correct page
     if (fseek(fHandle->mgmtInfo, pageNum*PAGE_SIZE, SEEK_SET) != 0)
         return RC_FILE_OFFSET_FAILED;
-    
+
     //read page from disk to memory
     if (fread(memPage, 1, PAGE_SIZE, fHandle->mgmtInfo) != PAGE_SIZE)
         return RC_READ_FILE_FAILED;
@@ -238,7 +238,7 @@ int getBlockPos (SM_FileHandle *fHandle){
 
 //read block with pagenum = 0
 RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
-    readBlock(0, fHandle, memPage);
+    return readBlock(0, fHandle, memPage);
 }
 
 //read previous block pagenum = currentpagenum - 1
