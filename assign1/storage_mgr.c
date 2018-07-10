@@ -197,3 +197,70 @@ RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle){
     }
     return RC_OK;
 }
+
+
+
+
+/* reading blocks from disc */
+//read a block from a file
+RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
+    //check if page number is positive
+    if(pageNum < 0)
+        return RC_READ_NON_EXISTING_PAGE;
+
+    //check if file handle exists
+    if (!fHandle)
+        return RC_FILE_HANDLE_NOT_INIT;
+
+    //check if the file handle pointer exists
+    if (!fHandle->mgmtInfo)
+        return RC_FILE_NOT_INITIALIZED;
+
+    //moves the write pointer to the correct page
+    if (fseek(fHandle->mgmtInfo, pageNum*PAGE_SIZE, SEEK_SET) != 0)
+        return RC_FILE_OFFSET_FAILED;
+    
+    //read page from disk to memory
+    if (fread(memPage, 1, PAGE_SIZE, fHandle->mgmtInfo) != PAGE_SIZE)
+        return RC_READ_FILE_FAILED;
+
+    return RC_OK;
+}
+
+//get position of the current block
+int getBlockPos (SM_FileHandle *fHandle){
+    //check if file handle exists
+    if (!fHandle)
+        return RC_FILE_HANDLE_NOT_INIT;
+
+    return fHandle->curPagePos;
+}
+
+//read block with pagenum = 0
+RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    readBlock(0, fHandle, memPage);
+}
+
+//read previous block pagenum = currentpagenum - 1
+RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    //** curPagePos to be changed
+    return readBlock(fHandle->curPagePos - 1, fHandle, memPage);
+}
+
+//read block with current page number
+RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    //** curPagePos to be changed
+    return readBlock(fHandle->curPagePos, fHandle, memPage);
+}
+
+//read previous block pagenum = currentpagenum + 1
+RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    //** curPagePos to be changed
+    return readBlock(fHandle->curPagePos + 1, fHandle, memPage);
+}
+
+
+RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
+    return readBlock(fHandle->totalNumPages - 1, fHandle, memPage);
+}
+
