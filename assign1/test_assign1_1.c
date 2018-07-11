@@ -19,8 +19,8 @@ char *testName;
 static void testCreateOpenClose(void);
 static void testSinglePageContent(void);
 static void testPageInfo(void);
-static void testEnsureCapacity(void);
-static void testAppendEmptyBlock(void);
+//static void testEnsureCapacity(void);
+//static void testAppendEmptyBlock(void);
 static void testErrorCases(void);
 
 /* main function running all tests */
@@ -151,9 +151,7 @@ testPageInfo(void) {
 
     //test block size
     struct stat st;
-    if(stat(fh.fileName,&st)!= 0){
-      return RC_FILE_NOT_INITIALIZED;
-    }
+    stat(fh.fileName,&st);
     ASSERT_TRUE((PAGE_SIZE == st.st_size), "Page size is correct");
 
     TEST_CHECK(closePageFile (&fh));
@@ -219,6 +217,7 @@ void
 testErrorCases(void) {
     SM_FileHandle fh;
     SM_PageHandle ph = (SM_PageHandle) malloc(PAGE_SIZE);
+    testName = ("testErrorCases");
     printf("\n\t\tTESTING FUNCTION ARGUMENT ERRORS\n");
 
     //check RC_NO_FILENAME on invalid fileName

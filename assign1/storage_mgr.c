@@ -248,8 +248,8 @@ int getBlockPos (SM_FileHandle *fHandle){
 //else if page read is successful set current page to 0
 RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
     RC returnCode = readBlock(0, fHandle, memPage);
-    if(RC == RC_OK)
-        fHandle->curPagePos = page;
+    if(returnCode == RC_OK)
+        fHandle->curPagePos = 0;
 
     return returnCode;
 }
@@ -260,7 +260,7 @@ RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
     int page = fHandle->curPagePos - 1;
     RC returnCode = readBlock(page, fHandle, memPage);
-    if(RC == RC_OK)
+    if(returnCode == RC_OK)
         fHandle->curPagePos = page;
 
     return returnCode;
@@ -277,7 +277,7 @@ RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
     int page = fHandle->curPagePos + 1;
     RC returnCode = readBlock(page, fHandle, memPage);
-    if(RC == RC_OK)
+    if(returnCode == RC_OK)
         fHandle->curPagePos = page;
 
     return returnCode;
@@ -289,7 +289,7 @@ RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
     int page = fHandle->totalNumPages - 1;
     RC returnCode = readBlock(page, fHandle, memPage);
-    if(RC == RC_OK)
+    if(returnCode == RC_OK)
         fHandle->curPagePos = page;
 
     return returnCode;
