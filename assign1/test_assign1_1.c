@@ -277,7 +277,16 @@ testReadWrite(void) {
 
 
 /*****************************************************************************
-          testPageInfo will test the certain steps taken in writeBlock
+          testPageInfo will test the certain steps taken in writeBlock and
+          it will test appendEmptyBlock
+
+          Tests:
+                  File handle's file initialization----[done]
+                  Page size created is correct size----[done]
+
+                  appendEmptyBlock performs correctly--[done]
+
+
 ******************************************************************************/
 void
 testPageInfo(void) {
@@ -302,6 +311,9 @@ testPageInfo(void) {
     stat(fh.fileName,&st);
     ASSERT_TRUE((PAGE_SIZE == st.st_size), "Page size is correct");
 
+    //Test appendEmptyBlock by adding page to file
+    TEST_CHECK(appendEmptyBlock(&fh));
+    ASSERT_EQUALS_INT(2, fh.totalNumPages, "Total page numbers is correct: 2 pages");
     TEST_CHECK(closePageFile (&fh));
     // destroy new page file
     TEST_CHECK(destroyPageFile (TESTPF));
@@ -309,6 +321,10 @@ testPageInfo(void) {
     TEST_DONE();
 }
 
+/*TEST to see if appendEmptyBlock works by :
+    using that function to create a block on the next page and
+    then validating that the page exists.
+*/
 /*****************************************************************************
     testEnsureCapacity will test the ensureCapacity function
 ******************************************************************************
