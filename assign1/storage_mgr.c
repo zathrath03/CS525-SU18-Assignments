@@ -244,28 +244,56 @@ int getBlockPos (SM_FileHandle *fHandle){
 }
 
 //read block with pagenum = 0
+//if error reading page, return error code
+//else if page read is successful set current page to 0
 RC readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
-    return readBlock(0, fHandle, memPage);
+    RC returnCode = readBlock(0, fHandle, memPage);
+    if(returnCode == RC_OK)
+        fHandle->curPagePos = 0;
+
+    return returnCode;
 }
 
 //read previous block pagenum = currentpagenum - 1
+//if error reading page, return error code
+//else if page read is successful set current page to new page number
 RC readPreviousBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
-    //** curPagePos to be changed
-    return readBlock(fHandle->curPagePos - 1, fHandle, memPage);
+    int page = fHandle->curPagePos - 1;
+    RC returnCode = readBlock(page, fHandle, memPage);
+    if(returnCode == RC_OK)
+        fHandle->curPagePos = page;
+
+    return returnCode;
 }
 
 //read block with current page number
 RC readCurrentBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
-    //** curPagePos to be changed
     return readBlock(fHandle->curPagePos, fHandle, memPage);
 }
 
 //read previous block pagenum = currentpagenum + 1
+//if error reading page, return error code
+//else if page read is successful set current page to new page number
 RC readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
-    //** curPagePos to be changed
-    return readBlock(fHandle->curPagePos + 1, fHandle, memPage);
+    int page = fHandle->curPagePos + 1;
+    RC returnCode = readBlock(page, fHandle, memPage);
+    if(returnCode == RC_OK)
+        fHandle->curPagePos = page;
+
+    return returnCode;
 }
 
+//read block with pagenum = last page number
+//if error reading page, return error code
+//else if page read is successful set current page to new page number
 RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
-    return readBlock(fHandle->totalNumPages - 1, fHandle, memPage);
+    int page = fHandle->totalNumPages - 1;
+    RC returnCode = readBlock(page, fHandle, memPage);
+    if(returnCode == RC_OK)
+        fHandle->curPagePos = page;
+
+    return returnCode;
 }
+
+
+

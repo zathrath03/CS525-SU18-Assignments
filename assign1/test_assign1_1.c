@@ -59,7 +59,7 @@ test if info written correctly to disk using "read from disk commands"
 void
 testCreateOpenClose(void) {
     SM_FileHandle fh;
-
+    printf("\n\t\tTESTING CREATE OPEN AND CLOSE METHODS\n");
     testName = "test create open and close methods";
 
     TEST_CHECK(createPageFile (TESTPF));
@@ -84,7 +84,7 @@ testSinglePageContent(void) {
     SM_FileHandle fh;
     SM_PageHandle ph;
     int i, counter = 0;
-
+    printf("\n\t\tTESTING SINGLE PAGE CONTENT\n");
     testName = "test single page content";
 
     ph = (SM_PageHandle) malloc(PAGE_SIZE);
@@ -147,6 +147,7 @@ testSinglePageContent(void) {
                         ~writeCurrentBlock--[done]
 
           Additionally: ~ensureCapacity-----[done]
+                        ~getBlockPos--------[done]
 ******************************************************************************/
 void
 testReadWrite(void) {
@@ -263,6 +264,7 @@ testReadWrite(void) {
     }
     ASSERT_TRUE((counter == 0), "Read the next block (block 3) successfully\n");
 
+    ASSERT_TRUE(getBlockPos(&fh) == 3, "getBlockPos returned the correct block position (block3)\n");
 
     //close page file before delete
     TEST_CHECK(closePageFile (&fh));
