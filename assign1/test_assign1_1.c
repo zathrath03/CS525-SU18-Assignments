@@ -19,8 +19,8 @@ char *testName;
 static void testCreateOpenClose(void);
 static void testSinglePageContent(void);
 static void testPageInfo(void);
-static void testEnsureCapacity(void);
-static void testAppendEmptyBlock(void);
+//static void testEnsureCapacity(void);
+//static void testAppendEmptyBlock(void);
 static void testErrorCases(void);
 static void testReadWrite(void);
 
@@ -259,13 +259,13 @@ testReadWrite(void) {
     ASSERT_TRUE((counter == 0), "Read the previous block (block 2) successfully\n");
 
     //Testing readNextBlock
-    printf("Testing 'readNextBlock' by reading the next block which is the 4th block\n");
+    printf("Testing 'readNextBlock' by reading the next block which is the 3rd block\n");
     TEST_CHECK(readNextBlock(&fh, ph));
     for (i=0; i < PAGE_SIZE; i++){
-        if(ph[i] !='4')
+        if(ph[i] !='3')
             counter++;
     }
-    ASSERT_TRUE((counter == 0), "Read the next block (block 4) successfully\n");
+    ASSERT_TRUE((counter == 0), "Read the next block (block 3) successfully\n");
 
 
     //close page file before delete
@@ -299,12 +299,8 @@ testPageInfo(void) {
 
     //test block size
     struct stat st;
-    if(stat(fh.fileName,&st)!= 0){
-      return RC_FILE_NOT_INITIALIZED;
-    }
-    //Check if, after filling a page with null elements, will it equal 4096 bytes
+    stat(fh.fileName,&st);
     ASSERT_TRUE((PAGE_SIZE == st.st_size), "Page size is correct");
-
 
     TEST_CHECK(closePageFile (&fh));
     // destroy new page file
@@ -369,6 +365,7 @@ void
 testErrorCases(void) {
     SM_FileHandle fh;
     SM_PageHandle ph = (SM_PageHandle) malloc(PAGE_SIZE);
+    testName = ("testErrorCases");
     printf("\n\t\tTESTING FUNCTION ARGUMENT ERRORS\n");
 
     //check RC_NO_FILENAME on invalid fileName
