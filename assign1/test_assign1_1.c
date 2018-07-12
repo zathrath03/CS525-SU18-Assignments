@@ -19,8 +19,6 @@ char *testName;
 static void testCreateOpenClose(void);
 static void testSinglePageContent(void);
 static void testPageInfo(void);
-//static void testEnsureCapacity(void);
-//static void testAppendEmptyBlock(void);
 static void testErrorCases(void);
 static void testReadWrite(void);
 
@@ -34,8 +32,6 @@ main (void) {
     testCreateOpenClose();
     testSinglePageContent();
     testPageInfo();
-//    testEnsureCapacity();
-//    testAppendEmptyBlock();
     testErrorCases();
     testReadWrite();
 
@@ -314,59 +310,6 @@ testPageInfo(void) {
     //Test appendEmptyBlock by adding page to file
     TEST_CHECK(appendEmptyBlock(&fh));
     ASSERT_EQUALS_INT(2, fh.totalNumPages, "Total page numbers is correct: 2 pages");
-    TEST_CHECK(closePageFile (&fh));
-    // destroy new page file
-    TEST_CHECK(destroyPageFile (TESTPF));
-
-    TEST_DONE();
-}
-
-/*TEST to see if appendEmptyBlock works by :
-    using that function to create a block on the next page and
-    then validating that the page exists.
-*/
-/*****************************************************************************
-    testEnsureCapacity will test the ensureCapacity function
-******************************************************************************
-void
-testEnsureCapacity(void) {
-    SM_FileHandle fh;
-    //SM_PageHandle ph;
-    testName = "test ensureCapacity method";
-
-    TEST_CHECK(createPageFile (TESTPF));
-    TEST_CHECK(openPageFile (TESTPF, &fh));
-    TEST_CHECK(ensureCapacity(4,&fh));
-    //Check to see if the file handle contains the correct number of pages
-    ASSERT_EQUALS_INT(fh.totalNumPages, 4, "Correct number of pages exist");
-    // close new page file
-    TEST_CHECK(closePageFile (&fh));
-    // destroy new page file
-    TEST_CHECK(destroyPageFile (TESTPF));
-
-    TEST_DONE();
-}
-*/
-/*****************************************************************************
-    testAppendEmptyBlock will test the ensureCapacity function
-******************************************************************************
-void
-testAppendEmptyBlock(void) {
-    SM_FileHandle fh;
-    //SM_PageHandle ph;
-    testName = "test ensureCapacity method";
-
-    TEST_CHECK(createPageFile (TESTPF));
-    TEST_CHECK(openPageFile (TESTPF, &fh));
-
-    //append a page to the new page file
-    TEST_CHECK(appendEmptyBlock(&fh));
-
-    //check if a new page has been appended
-    ASSERT_EQUALS_INT(fh.totalNumPages, 2, "A second page has been appended");
-
-    //check if the new page is empty with null values using READ COMMANDS
-
 
     // close new page file
     TEST_CHECK(closePageFile (&fh));
@@ -375,7 +318,6 @@ testAppendEmptyBlock(void) {
 
     TEST_DONE();
 }
-*/
 
 void
 testErrorCases(void) {
