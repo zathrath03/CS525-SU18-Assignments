@@ -2,8 +2,10 @@
 #include "dberror.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <math.h>
+#include <string.h>
 
 void initStorageManager(){
     return;
@@ -75,7 +77,17 @@ RC destroyPageFile (char *fileName){
         return RC_NO_FILENAME;
     }
     if(remove(fileName)!=0){
-        return RC_FILE_NOT_CLOSED;
+        printf("FILE NOT CLOSED, we will try unlink.\n");
+        char filePath[1024];
+        if(!getcwd(filePath,sizeof(filePath))){
+            printf("Something wrong.\n");
+            return RC_FILE_NOT_FOUND;
+        }
+        strcat(filePath, "\\");
+        strcat(filePath, fileName);
+        if(unlink(filePath)<0){
+            printf("FILE DELETION WILL BE DEFFERED.\n");
+        }
     }
     return RC_OK;
 }

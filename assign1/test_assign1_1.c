@@ -358,7 +358,7 @@ testErrorCases(void) {
     fh.mgmtInfo = temp; //restores the original FILE *stream
 
     //check RC_FILE_NOT_CLOSED
-    ASSERT_TRUE((destroyPageFile(TESTPF) == RC_FILE_NOT_CLOSED), "destroyPageFile() RC_FILE_NOT_CLOSED check");
+    ASSERT_TRUE((destroyPageFile(TESTPF) == RC_OK), "destroyPageFile() RC_OK check");
 
     //check RC_FILE_OFFSET_FAILED
     ASSERT_TRUE((writeBlock(-1, &fh, ph) == RC_FILE_OFFSET_FAILED), "writeBlock() RC_FILE_OFFSET_FAILED check");
