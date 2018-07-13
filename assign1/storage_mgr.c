@@ -211,10 +211,6 @@ RC ensureCapacity (int numberOfPages, SM_FileHandle *fHandle){
 *********************************************************/
 //read a block from a file
 RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
-    //check if page number is positive
-    if(pageNum < 0)
-        return RC_READ_NON_EXISTING_PAGE;
-
     //check if file handle exists
     if (!(fHandle->fileName) || !(fHandle->totalNumPages))
         return RC_FILE_HANDLE_NOT_INIT;
@@ -222,6 +218,10 @@ RC readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage){
     //check if the file handle pointer exists
     if (!fHandle->mgmtInfo)
         return RC_FILE_NOT_INITIALIZED;
+
+    //check if page number is valid
+    if(pageNum < 0 || pageNum >= fHandle->totalNumPages)
+        return RC_READ_NON_EXISTING_PAGE;
 
     //moves the write pointer to the correct page
     if (fseek(fHandle->mgmtInfo, pageNum*PAGE_SIZE, SEEK_SET) != 0)
