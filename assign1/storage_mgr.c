@@ -105,7 +105,7 @@ pageNum: The page in the file referred to by fHandle at
 fHandle: Struct which contains the FILE *stream destination
          stored in ->mgmtInfo
 memPage: The page in main memory that is to be written to disk.
-         memPage is required to be <= PAGE_SIZE
+         Only writes the first PAGE_SIZE bytes to disk
 RETURNS: RC_OK, RC_FILE_HANDLE_NOT_INIT, RC_FILE_NOT_INITIALIZED,
          RC_FILE_OFFSET_FAILED, RC_INCOMPATIBLE_BLOCKSIZE,
          or RC_FILE_WRITE_FAILED
@@ -122,9 +122,6 @@ RC writeBlock(int pageNum, SM_FileHandle* fHandle, SM_PageHandle memPage) {
     //negative page numbers are not allowed
     if (pageNum < 0)
         return RC_FILE_OFFSET_FAILED;
-    //check that the memPage can fit in a block
-    if (sizeof(*memPage) > PAGE_SIZE)
-        return RC_INCOMPATIBLE_BLOCKSIZE;
     //expands the file if necessary to write at pageNum
     if ((returnCode = ensureCapacity(pageNum, fHandle)) != RC_OK)
         return returnCode;

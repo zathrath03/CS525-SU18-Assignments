@@ -367,9 +367,6 @@ testErrorCases(void) {
     ASSERT_TRUE((writeCurrentBlock(&fh, ph) == RC_FILE_OFFSET_FAILED), "writeCurrentBlock() RC_FILE_OFFSET_FAILED check");
     fh.curPagePos = tempCurPag;
 
-    //check RC_INCOMPATIBLE_BLOCKSIZE
-    //ph = (SM_PageHandle) malloc(PAGE_SIZE*2);
-    //ASSERT_TRUE((writeBlock(0, &fh, ph) == RC_INCOMPATIBLE_BLOCKSIZE), "writeBlock() RC_INCOMPATIBLE_BLOCKSIZE check");
 
     closePageFile(&fh);
     destroyPageFile(TESTPF);
