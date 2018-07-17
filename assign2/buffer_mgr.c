@@ -56,8 +56,9 @@ method. Similarly, the data field should point to the page frame the
 page is stored in (the area in memory storing the content of the
 page).
 *********************************************************************/
-RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page){
-
+RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
+    PageNumber pageNum){
+    
 }
 
 /*********************************************************************
@@ -71,7 +72,7 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
 /*********************************************************************
 markDirty marks a page as dirty.
 *********************************************************************/
-RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
+RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page){
 
 }
 
@@ -79,8 +80,9 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 forcePage should write the current content of the page back to the
 page file on disk.
 *********************************************************************/
-RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
-    PageNumber pageNum);
+RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
+
+}
 
 /*********************************************************************
 *
