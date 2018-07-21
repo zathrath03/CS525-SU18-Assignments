@@ -9,10 +9,10 @@ typedef struct BM_PoolInfo {
     BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
     int numReadIO; //track number of pages read from disk since initialization
     int numWriteIO; //track number of pages written to disk since initialization
-    bool *isDirtyArray; //array that tracks the dirty state of each page
-    int *fixCountArray; //array that tracks the fixCount of each page
+    bool *isDirtyArray; //array that tracks the dirty state of each frame
+    int *fixCountArray; //array that tracks the fixCount of each frame
     void *rplcStratStruct; //contains data needed for replacement strategy
-} poolInfo;
+} BM_PoolInfo;
 
 /*********************************************************************
 *
@@ -89,8 +89,21 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
 markDirty marks a page as dirty.
 *********************************************************************/
 RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page){
+    //get memory address of the first page
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
 
-    return RC_OK;
+    //search through the pages stored in the buffer pool for the page of interest
+    for (int i = 0; i < bm->numPages; i++){
+        frame_ptr += i; //address of the ith frame
+        if (frame_ptr->pageNum == page->pageNum){
+            //mark page as dirty
+            poolInfo->isDirtyArray[i] = 1;
+            return RC_OK;
+        }
+    }
+
+    return RC_BM_PAGE_NOT_FOUND;
 }
 
 /*********************************************************************
@@ -98,6 +111,31 @@ forcePage should write the current content of the page back to the
 page file on disk.
 *********************************************************************/
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
+    SM_FileHandle fHandle;
+    RC returnCode = RC_OK;
+
+    if((returnCode = openPageFile(bm->pageFile, &fHandle)) != RC_OK)
+        return returnCode;
+
+    if((returnCode = writeBlock(page->pageNum, &fHandle, page->data)) != RC_OK)
+        return returnCode;
+
+    if((returnCode = closePageFile(&fHandle)) != RC_OK)
+        return returnCode;
+
+    //get memory address of the first page
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
+
+    //search through the pages stored in the buffer pool for the page of interest
+    for (int i = 0; i < bm->numPages; i++){
+        frame_ptr += i; //address of the ith frame
+        if (frame_ptr->pageNum == page->pageNum){
+            //mark page as clean
+            poolInfo->isDirtyArray[i] = 0;
+            return RC_OK;
+        }
+    }
 
     return RC_OK;
 }
