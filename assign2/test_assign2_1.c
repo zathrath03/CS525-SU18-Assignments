@@ -286,7 +286,7 @@ testLRU (void)
       pinPage(bm, h, 5 + i);
       unpinPage(bm, h);
       ASSERT_EQUALS_POOL(poolContents[snapshot], bm, "check pool content using pages");
-      snapthot++;
+      snapshot++;
   }
 
   // check number of write IOs

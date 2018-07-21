@@ -3,9 +3,7 @@
 
 // Include return codes and methods for logging errors
 #include "dberror.h"
-
-// Include bool DT
-#include "dt.h"
+#include <stdbool.h>
 
 // Replacement Strategies
 typedef enum ReplacementStrategy {

@@ -4,9 +4,27 @@
 
 ### Data Structures
 
-`BM_BufferPool` *stores information about a buffer pool: the name of the page file associated with the buffer pool (pageFile), the size of the buffer pool, i.e., the number of page frames (numPages), the page replacement strategy (strategy), and a pointer to bookkeeping data (mgmtData). Similar to the first assignment, you can use the mgmtData to store any necessary information about a buffer pool that you need to implement the interface. For example, this could include a pointer to the area in memory that stores the page frames or data structures needed by the page replacement strategy to make replacement decisions.*
+#### BM_BufferPool
 
-`BM_PageHandle` *stores information about a page. The page number (position of the page in the page file) is stored in pageNum. The page number of the first data page in a page file is 0. The data field points to the area in memory storing the content of the page. This will usually be a page frame from your buffer pool.*
+```c
+typedef struct BM_BufferPool {
+  char *pageFile;
+  int numPages;
+  ReplacementStrategy strategy;
+  void *mgmtData;
+} BM_BufferPool;
+```
+*stores information about a buffer pool: the name of the page file associated with the buffer pool (pageFile), the size of the buffer pool, i.e., the number of page frames (numPages), the page replacement strategy (strategy), and a pointer to bookkeeping data (mgmtData). Similar to the first assignment, you can use the mgmtData to store any necessary information about a buffer pool that you need to implement the interface. For example, this could include a pointer to the area in memory that stores the page frames or data structures needed by the page replacement strategy to make replacement decisions.*
+
+#### BM_PageHandle
+
+```c
+typedef struct BM_PageHandle {
+  PageNumber pageNum;
+  char *data;
+} BM_PageHandle;
+```
+*stores information about a page. The page number (position of the page in the page file) is stored in pageNum. The page number of the first data page in a page file is 0. The data field points to the area in memory storing the content of the page. This will usually be a page frame from your buffer pool.*
 
 ### Buffer Manager Interface Pool Handling
 
@@ -105,5 +123,13 @@ int getNumWriteIO (BM_BufferPool *const bm);
 *returns the number of pages written to the page file since the buffer pool has been initialized.*
 
 ## Page Replacement Strategies
+
+### Clock
+
+```c
+BM_PageHandle Clock (BM_BufferPool *const bm);
+```
+
+*traverses through the frames*
 
 ## Testing

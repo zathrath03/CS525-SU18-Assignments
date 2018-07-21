@@ -3,6 +3,16 @@
 #include <stdbool.h>
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
+#include "replace_strat.h"
+
+typedef struct BM_PoolInfo {
+    BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
+    int numReadIO; //track number of pages read from disk since initialization
+    int numWriteIO; //track number of pages written to disk since initialization
+    bool *isDirtyArray; //array that tracks the dirty state of each page
+    int *fixCountArray; //array that tracks the fixCount of each page
+    void *rplcStratStruct; //contains data needed for replacement strategy
+} poolInfo;
 
 /*********************************************************************
 *
@@ -22,6 +32,7 @@ LRU-k this could be the parameter k.
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
     const int numPages, ReplacementStrategy strategy, void *stratData){
 
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -34,6 +45,7 @@ pinned pages.
 *********************************************************************/
 RC shutdownBufferPool(BM_BufferPool *const bm){
 
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -42,6 +54,7 @@ buffer pool to be written to disk.
 *********************************************************************/
 RC forceFlushPool(BM_BufferPool *const bm){
 
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -59,7 +72,8 @@ page).
 *********************************************************************/
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     PageNumber pageNum){
-    
+
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -68,6 +82,7 @@ used to figure out which page to unpin.
 *********************************************************************/
 RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -75,6 +90,7 @@ markDirty marks a page as dirty.
 *********************************************************************/
 RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page){
 
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -83,6 +99,7 @@ page file on disk.
 *********************************************************************/
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -99,6 +116,7 @@ constant NO_PAGE.
 *********************************************************************/
 PageNumber *getFrameContents (BM_BufferPool *const bm){
 
+    return (PageNumber)0;
 }
 
 /*********************************************************************
@@ -108,6 +126,7 @@ page frame is dirty. Empty page frames are considered as clean.
 *********************************************************************/
 bool *getDirtyFlags (BM_BufferPool *const bm){
 
+    return true;
 }
 
 /*********************************************************************
@@ -117,6 +136,7 @@ page frame. Return 0 for empty page frames.
 *********************************************************************/
 int *getFixCounts (BM_BufferPool *const bm){
 
+    return 0;
 }
 
 /*********************************************************************
@@ -127,6 +147,7 @@ update whenever a page is read from the page file into a page frame.
 *********************************************************************/
 int getNumReadIO (BM_BufferPool *const bm){
 
+    return 0;
 }
 
 /*********************************************************************
@@ -135,4 +156,5 @@ since the buffer pool has been initialized.
 *********************************************************************/
 int getNumWriteIO (BM_BufferPool *const bm){
 
+    return 0;
 }
