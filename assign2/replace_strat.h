@@ -5,21 +5,21 @@ typedef struct listNode {
     struct listNode *nextNode;
 } listNode;
 
-typedef struct FIFO {
+typedef struct RS_FIFOInfo {
     listNode *head;
     listNode *tail;
-} fifo;
+} RS_FIFOInfo;
 
-typedef struct LRU {
+typedef struct RS_LRUInfo {
     listNode *head;
     listNode *tail;
-} lru;
+} RS_LRUInfo;
 
 typedef struct RS_ClockInfo {
     bool *wasReferencedArray;
     int curPage;
 } RS_ClockInfo;
 
-typedef struct LFU {
+typedef struct RS_LFUInfo {
     //I have no idea what you need in this struct
-} lfu;
+} RS_LFUInfo;
