@@ -368,8 +368,8 @@ responsible to initializing this statistic at pool creating time and
 update whenever a page is read from the page file into a page frame.
 *********************************************************************/
 int getNumReadIO (BM_BufferPool *const bm){
-
-    return 0;
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    return poolInfo->numReadIO;
 }
 
 /*********************************************************************
@@ -377,6 +377,6 @@ getNumWriteIO returns the number of pages written to the page file
 since the buffer pool has been initialized.
 *********************************************************************/
 int getNumWriteIO (BM_BufferPool *const bm){
-
-    return 0;
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    return poolInfo->numWriteIO;
 }
