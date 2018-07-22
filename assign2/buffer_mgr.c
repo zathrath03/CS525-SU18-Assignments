@@ -99,10 +99,10 @@ RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page){
 
     //search through the pages stored in the buffer pool for the page of interest
     for (int i = 0; i < bm->numPages; i++){
-        frame_ptr += i; //address of the ith frame
-        if (frame_ptr->pageNum == page->pageNum){
+        //frame_ptr + i is the address of the ith frame
+        if ((frame_ptr + i)->pageNum == page->pageNum){
             //mark page as dirty
-            poolInfo->isDirtyArray[i] = 1;
+            poolInfo->isDirtyArray[i] = true;
             return RC_OK;
         }
     }
@@ -133,10 +133,10 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
 
     //search through the pages stored in the buffer pool for the page of interest
     for (int i = 0; i < bm->numPages; i++){
-        frame_ptr += i; //address of the ith frame
-        if (frame_ptr->pageNum == page->pageNum){
+        //frame_ptr + i is the address of the ith frame
+        if ((frame_ptr + i)->pageNum == page->pageNum){
             //mark page as clean
-            poolInfo->isDirtyArray[i] = 0;
+            poolInfo->isDirtyArray[i] = false;
             return RC_OK;
         }
     }
