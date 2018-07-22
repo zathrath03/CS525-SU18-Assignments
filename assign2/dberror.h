@@ -21,6 +21,10 @@ typedef int RC;
 #define RC_FILE_OFFSET_FAILED 9
 #define RC_INCOMPATIBLE_BLOCKSIZE 10
 #define RC_READ_FILE_FAILED 11
+#define RC_INVALID_PAGE_NUMBER 12
+
+#define RC_BM_PAGE_NOT_FOUND 100
+#define RC_BM_NOT_ALLOCATED 101
 
 #define RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE 200
 #define RC_RM_EXPR_RESULT_IS_NOT_BOOLEAN 201
@@ -34,7 +38,8 @@ typedef int RC;
 #define RC_IM_N_TO_LAGE 302
 #define RC_IM_NO_MORE_ENTRIES 303
 
-#define RC_BM_PAGE_NOT_FOUND 400
+
+#define RC_RS_UNKNOWN 400;
 
 /* holder for error messages */
 extern char *RC_message;

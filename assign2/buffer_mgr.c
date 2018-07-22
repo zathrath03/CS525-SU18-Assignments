@@ -1,19 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
 #include "replace_strat.h"
 
-typedef struct BM_PoolInfo {
-    BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
-    int numReadIO; //track number of pages read from disk since initialization
-    int numWriteIO; //track number of pages written to disk since initialization
-    bool *isDirtyArray; //array that tracks the dirty state of each frame
-    int *fixCountArray; //array that tracks the fixCount of each frame
-    void *rplcStratStruct; //contains data needed for replacement strategy
-} BM_PoolInfo;
-
+//PROTOTYPES
+RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * stratData);
+RC initRelpacementStrategy(BM_PoolInfo * pi,ReplacementStrategy strategy,void *stratData);
+RC freeReplacementStrategy(BM_BufferPool *const bm);
 /*********************************************************************
 *
 *             BUFFER MANAGER INTERFACE POOL HANDLING
@@ -31,7 +27,69 @@ LRU-k this could be the parameter k.
 *********************************************************************/
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
     const int numPages, ReplacementStrategy strategy, void *stratData){
+    //check BM_BufferPool has space allocated
+    if(!bm){
+        return RC_BM_NOT_ALLOCATED;
+    }
+    //check we have fileName
+    if(!pageFileName){
+        return RC_NO_FILENAME;
+    }
+    bm->pageFile = (char *)pageFileName;
+    //check if the pageFile is a valid one
+    if(access(pageFileName, 0) == -1){
+        return RC_FILE_NOT_FOUND;
+    }
+    //check the number of pages
+    if(numPages<1){
+        return RC_INVALID_PAGE_NUMBER;
+    }
+    bm->numPages = numPages;
+    bm->strategy = strategy;
+    return initBufferPoolInfo(bm,strategy,stratData);
+}
 
+RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * stratData){
+    BM_PoolInfo * pi = MAKE_POOL_INFO();
+    //initialize PoolInfo values
+    pi->numReadIO = 0;
+    pi->numWriteIO = 0;
+
+    //Set the isDirtyArray,fixCountArray to false,0
+    bool isDirtyArray[bm->numPages];
+    for(int i =0; i <bm->numPages;i++){
+        isDirtyArray[i]=false;
+    }
+    pi->isDirtyArray = isDirtyArray;
+    int fixCountArray[bm->numPages];
+    for(int i; i<bm->numPages;i++){
+        fixCountArray[i]=0;
+    }
+    pi->fixCountArray = fixCountArray;
+
+    //allocate memory for pageFrames
+    pi->poolMem_ptr = malloc(sizeof(BM_PageHandle)*bm->numPages);
+    bm->mgmtData = pi;
+    return initRelpacementStrategy(pi, strategy, stratData);
+}
+
+
+RC initRelpacementStrategy(BM_PoolInfo * pi,ReplacementStrategy strategy,void *stratData){
+    switch(strategy){
+    case RS_FIFO:
+        break;
+    case RS_LRU:
+        break;
+    case RS_CLOCK:
+        break;
+    case RS_LFU:
+        break;
+    case RS_LRU_K:
+        break;
+    default:
+        printf("UNKNOWN REPLACEMENT STRATEGY");
+        return RC_RS_UNKNOWN;
+    }
     return RC_OK;
 }
 
@@ -42,9 +100,56 @@ the memory allocated for page frames. If the buffer pool contains any
 dirty pages, then these pages should be written back to disk before
 destroying the pool. It is an error to shutdown a buffer pool that has
 pinned pages.
+Resources such as:
+- pagesFrame ptrs
+- struct for poolInfo
+- struct for BufferManager
 *********************************************************************/
-RC shutdownBufferPool(BM_BufferPool *const bm){
+RC shutdownBufferPool(BM_BufferPool *const bm)
+{
+    RC rc;
+    if((rc = forceFlushPool(bm))!=RC_OK )
+    {
+        return rc;
+    }
+    //free up space from pageFrames
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
 
+    for (int i = 0; i < bm->numPages; i++)
+    {
+        frame_ptr += i; //address of the ith frame
+        free(frame_ptr);
+    }
+    if((rc = freeReplacementStrategy(bm))!=RC_OK){
+        return rc;
+    }
+    free(poolInfo);
+    free(bm);
+    return RC_OK;
+}
+
+
+/********************************************************************
+Free up any space allocated for a replacement strategy
+*********************************************************************/
+RC freeReplacementStrategy(BM_BufferPool *const bm){
+    ReplacementStrategy strategy = bm->strategy;
+    switch(strategy){
+    case RS_FIFO:
+        break;
+    case RS_LRU:
+        break;
+    case RS_CLOCK:
+        break;
+    case RS_LFU:
+        break;
+    case RS_LRU_K:
+        break;
+    default:
+        printf("UNKNOWN REPLACEMENT STRATEGY");
+        return RC_RS_UNKNOWN;
+    }
     return RC_OK;
 }
 
@@ -95,6 +200,19 @@ page).
 *********************************************************************/
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     PageNumber pageNum){
+
+    //When you pin the page, if bm->strategy is clock, I need you to
+    //set the bm->mgmtData->rplcStratStruct->wasReferencedArray to true
+    //for the frame you're pinning the page into
+    //frameNum is a place holder for however you're going to track what
+    //frame you're putting the data into
+    int frameNum = 0;
+    if(bm->strategy == RS_CLOCK){
+        BM_PoolInfo *poolInfo = bm->mgmtData;
+        RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
+
+        clockInfo->wasReferencedArray[frameNum] = true;
+    }
 
     return RC_OK;
 }
