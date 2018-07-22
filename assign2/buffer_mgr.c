@@ -9,6 +9,7 @@
 //PROTOTYPES
 RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * stratData);
 RC initRelpacementStrategy(BM_PoolInfo * pi,ReplacementStrategy strategy,void *stratData);
+RC freeReplacementStrategy(BM_BufferPool *const bm);
 /*********************************************************************
 *
 *             BUFFER MANAGER INTERFACE POOL HANDLING
@@ -133,6 +134,7 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
 Free up any space allocated for a replacement strategy
 *********************************************************************/
 RC freeReplacementStrategy(BM_BufferPool *const bm){
+    ReplacementStrategy strategy = bm->strategy;
     switch(strategy){
     case RS_FIFO:
         break;
