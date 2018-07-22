@@ -5,15 +5,6 @@
 #include "storage_mgr.h"
 #include "replace_strat.h"
 
-typedef struct BM_PoolInfo {
-    BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
-    int numReadIO; //track number of pages read from disk since initialization
-    int numWriteIO; //track number of pages written to disk since initialization
-    bool *isDirtyArray; //array that tracks the dirty state of each frame
-    int *fixCountArray; //array that tracks the fixCount of each frame
-    void *rplcStratStruct; //contains data needed for replacement strategy
-} BM_PoolInfo;
-
 /*********************************************************************
 *
 *             BUFFER MANAGER INTERFACE POOL HANDLING
@@ -72,6 +63,19 @@ page).
 *********************************************************************/
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     PageNumber pageNum){
+
+    //When you pin the page, if bm->strategy is clock, I need you to
+    //set the bm->mgmtData->rplcStratStruct->wasReferencedArray to true
+    //for the frame you're pinning the page into
+    //frameNum is a place holder for however you're going to track what
+    //frame you're putting the data into
+    int frameNum = 0;
+    if(bm->strategy == RS_CLOCK){
+        BM_PoolInfo *poolInfo = bm->mgmtData;
+        RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
+
+        clockInfo->wasReferencedArray[frameNum] = true;
+    }
 
     return RC_OK;
 }

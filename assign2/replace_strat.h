@@ -15,9 +15,10 @@ typedef struct LRU {
     listNode *tail;
 } lru;
 
-typedef struct clock {
+typedef struct RS_ClockInfo {
     bool *wasReferencedArray;
-} clock;
+    int curPage;
+} RS_ClockInfo;
 
 typedef struct LFU {
     //I have no idea what you need in this struct

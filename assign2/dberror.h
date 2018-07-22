@@ -22,6 +22,8 @@ typedef int RC;
 #define RC_INCOMPATIBLE_BLOCKSIZE 10
 #define RC_READ_FILE_FAILED 11
 
+#define RC_BM_PAGE_NOT_FOUND 100
+
 #define RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE 200
 #define RC_RM_EXPR_RESULT_IS_NOT_BOOLEAN 201
 #define RC_RM_BOOLEAN_EXPR_ARG_IS_NOT_BOOLEAN 202
@@ -33,8 +35,6 @@ typedef int RC;
 #define RC_IM_KEY_ALREADY_EXISTS 301
 #define RC_IM_N_TO_LAGE 302
 #define RC_IM_NO_MORE_ENTRIES 303
-
-#define RC_BM_PAGE_NOT_FOUND 400
 
 /* holder for error messages */
 extern char *RC_message;

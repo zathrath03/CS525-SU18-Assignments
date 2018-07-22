@@ -31,6 +31,15 @@ typedef struct BM_PageHandle {
   char *data;
 } BM_PageHandle;
 
+typedef struct BM_PoolInfo {
+    BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
+    int numReadIO; //track number of pages read from disk since initialization
+    int numWriteIO; //track number of pages written to disk since initialization
+    bool *isDirtyArray; //array that tracks the dirty state of each frame
+    int *fixCountArray; //array that tracks the fixCount of each frame
+    void *rplcStratStruct; //contains data needed for replacement strategy
+} BM_PoolInfo;
+
 // convenience macros
 #define MAKE_POOL()					\
   ((BM_BufferPool *) malloc (sizeof(BM_BufferPool)))
