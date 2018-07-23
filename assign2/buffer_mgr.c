@@ -265,6 +265,12 @@ forcePage should write the current content of the page back to the
 page file on disk.
 *********************************************************************/
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
+    //validate input
+    if(!bm)
+        return RC_BM_NOT_ALLOCATED;
+    if(!page)
+        return RC_BM_PAGE_NOT_FOUND;
+
     SM_FileHandle fHandle;
     RC returnCode = RC_OK;
 

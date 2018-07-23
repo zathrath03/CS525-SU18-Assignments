@@ -123,7 +123,9 @@ void clockInit(BM_BufferPool *bm){
 }
 
 void clockFree(BM_BufferPool *const bm){
-    free(bm->mgmtData->rplcStratStruct);
+    RS_ClockInfo *clockInfo = bm->mgmtData->rplcStratStruct;
+    free(clockInfo->wasReferencedArray);
+    free(clockInfo);
 }
 
 void clockPin(BM_BufferPool *const bm, int frameNum)

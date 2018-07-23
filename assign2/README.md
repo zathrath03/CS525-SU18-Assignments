@@ -11,10 +11,13 @@ typedef struct BM_BufferPool {
   char *pageFile;
   int numPages;
   ReplacementStrategy strategy;
-  void *mgmtData;
+  BM_PoolInfo *mgmtData;
 } BM_BufferPool;
 ```
 *stores information about a buffer pool: the name of the page file associated with the buffer pool (pageFile), the size of the buffer pool, i.e., the number of page frames (numPages), the page replacement strategy (strategy), and a pointer to bookkeeping data (mgmtData). Similar to the first assignment, you can use the mgmtData to store any necessary information about a buffer pool that you need to implement the interface. For example, this could include a pointer to the area in memory that stores the page frames or data structures needed by the page replacement strategy to make replacement decisions.*
+
+* Using mgmtData to point to a `BM_PoolInfo` struct, defined below
+* Changed the type of `mgmtData` to BM_PoolInfo to eliminate the need to constantly typecast it
 
 #### BM_PageHandle
 
