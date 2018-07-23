@@ -182,9 +182,32 @@ int findFrameNumber(BM_BufferPool * bm, PageNumber pageNumber){
 /*********************************************************************
 forceFlushPool causes all dirty pages (with fix count 0) from the
 buffer pool to be written to disk.
+
+typedef struct BM_PoolInfo {
+    BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
+    int numReadIO; //track number of pages read from disk since initialization
+    int numWriteIO; //track number of pages written to disk since initialization
+    bool *isDirtyArray; //array that tracks the dirty state of each frame
+    int *fixCountArray; //array that tracks the fixCount of each frame
+    void *rplcStratStruct; //contains data needed for replacement strategy
+} BM_PoolInfo;
 *********************************************************************/
 RC forceFlushPool(BM_BufferPool *const bm){
+    //get memory address of the first page
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
 
+    //search through the pages stored in the buffer pool for the page of interest
+    for (int i = 0; i < bm->numPages; i++){
+        frame_ptr += i; //address of the ith frame
+        if ((poolInfo->fixCountArray[i] == 0) && (poolInfo->isDirtyArray[i]==true)){
+            //once the page with dirty bit true and fix count =0 is found,
+            //write its information to the disk
+            (poolInfo->isDirtyArray[i]) == false;
+            (poolInfo->numWriteIO)++;
+            return RC_OK;
+        }
+    }
     return RC_OK;
 }
 
@@ -299,8 +322,24 @@ the ith page frame. An empty page frame is represented using the
 constant NO_PAGE.
 *********************************************************************/
 PageNumber *getFrameContents (BM_BufferPool *const bm){
+		//Create a frameContents array to hold all of the page numbers we need
+		PageNumber frameContents[bm->numPages];
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
 
-    return (PageNumber)0;
+  	//iterate through the frames
+    for (int i = 0; i < bm->numPages; i++){
+        frame_ptr += i; //address of the ith frame
+        frameContents[i] = 0;
+      	//Stores frame pointer into pageHandle in the BM_pageHandle struct
+      	BM_PageHandle *pageHandle = (frame_ptr+i);
+      	//if the pageHandle doesn't exist then set it to NO_PAGE
+      	if (!pageHandle)
+          frameContents[i] = NO_PAGE;
+      	else //If pageHandle exists, then set frame contents at the ith position to page number of that pageHandle
+          frameContents[i] = pageHandle->pageNum;
+    }
+    return (PageNumber*) *frameContents;
 }
 
 /*********************************************************************
@@ -309,18 +348,45 @@ numPages) where the ith element is TRUE if the page stored in the ith
 page frame is dirty. Empty page frames are considered as clean.
 *********************************************************************/
 bool *getDirtyFlags (BM_BufferPool *const bm){
+    //Create a dirtyFlags array to hold all of the page numbers we need
+		bool dirtyFlags[bm->numPages];
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
 
-    return true;
+  	//iterate through the frames, mimics functionality of isDirtyArray
+    for (int i = 0; i < bm->numPages; i++){
+        frame_ptr += i; //address of the ith frame
+        dirtyFlags[i] = 0;
+      	//if the dirty bit in the array is set to true, then add true to that ith element in the array dirtyFlags
+      	if (poolInfo->isDirtyArray[i] == true)
+          dirtyFlags[i] = true;
+      	else
+          dirtyFlags[i] = false;
+    }
+    return (bool*) *dirtyFlags;
 }
-
 /*********************************************************************
 getFixCounts returns an array of ints (of size numPages)
 where the ith element is the fix count of the page stored in the ith
 page frame. Return 0 for empty page frames.
 *********************************************************************/
 int *getFixCounts (BM_BufferPool *const bm){
+    //Create a fixCounts array to hold all of the page numbers we need
+		int fixCounts[bm->numPages];
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
 
-    return 0;
+  	//iterate through the frames, mimics functionality of fixCountArray
+    for (int i = 0; i < bm->numPages; i++){
+        frame_ptr += i; //address of the ith frame
+        fixCounts[i] = 0;
+      	//if the dirty bit in the array is set to true, then add true to that ith element in the array fixCounts
+      	if (poolInfo->fixCountArray[i] >= 1)
+          fixCounts[i] == (poolInfo->fixCountArray[i]);
+      	else
+          fixCounts[i] = 0;
+    }
+    return (int*) *fixCounts;
 }
 
 /*********************************************************************
@@ -330,8 +396,8 @@ responsible to initializing this statistic at pool creating time and
 update whenever a page is read from the page file into a page frame.
 *********************************************************************/
 int getNumReadIO (BM_BufferPool *const bm){
-
-    return 0;
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    return poolInfo->numReadIO;
 }
 
 /*********************************************************************
@@ -339,6 +405,6 @@ getNumWriteIO returns the number of pages written to the page file
 since the buffer pool has been initialized.
 *********************************************************************/
 int getNumWriteIO (BM_BufferPool *const bm){
-
-    return 0;
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    return poolInfo->numWriteIO;
 }
