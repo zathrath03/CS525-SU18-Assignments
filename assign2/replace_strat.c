@@ -1,9 +1,7 @@
+#include <stdlib.h>
 #include <stdbool.h>
 #include "buffer_mgr.h"
 #include "replace_strat.h"
-
-
-
 
 /*********************************************************************
 *
@@ -20,48 +18,28 @@ You should have the following functions implemented
 See LRU below as example
 *********************************************************************/
 
+/*********************************************************************
+*
+*                    FIFO Replacement Functions
+*
+*********************************************************************/
+void fifoInit(BM_BufferPool *bm){
+}
 
+void fifoFree(BM_BufferPool *const bm){
+}
+
+void fifoPin(BM_BufferPool *bm, int frameNum){
+}
 
 BM_PageHandle * fifoReplace(BM_BufferPool *const bm){
 
     return ((void*)0);
 }
 
-
-void clockPin(BM_BufferPool *const bm, PageNumber frameNum)
-{
-
-    BM_PoolInfo *poolInfo = bm->mgmtData;
-    RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
-    clockInfo->wasReferencedArray[frameNum] = true;
-
-}
-BM_PageHandle * clockReplace(BM_BufferPool *const bm){
-    //get memory address of the first page
-    BM_PoolInfo *poolInfo = bm->mgmtData;
-    RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
-    int frameNum = clockInfo->curPage % bm->numPages;
-
-    //search through the pages stored in the buffer pool for the page of interest
-    while(true){
-        //frame_ptr = poolInfo->poolMem_ptr + frameNum;
-
-        if (poolInfo->fixCountArray[frameNum] == 0 && clockInfo->wasReferencedArray == false)
-            return poolInfo->poolMem_ptr + frameNum;
-
-        frameNum = (frameNum + 1) % bm->numPages;
-    }
-
-    return ((void*)0);
-}
-
-BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
-
-    return ((void*)0);
-}
 /*********************************************************************
 *
-*             LRU Replacement Functions
+*                     LRU Replacement Functions
 *
 *********************************************************************/
 BM_PageHandle * lruReplace(BM_BufferPool *const bm){
@@ -122,4 +100,78 @@ int lruFindToReplace(BM_BufferPool *const bm){
         }
     }
     return minIndex;
+}
+
+/*********************************************************************
+*
+*                     Clock Replacement Functions
+*
+*********************************************************************/
+void clockInit(BM_BufferPool *bm){
+    //allocate memory for the RS_ClockInfo struct
+    RS_ClockInfo *clockInfo = ((RS_ClockInfo *) malloc (sizeof(RS_ClockInfo)));
+
+    //Store a reference to clockInfo in the BufferPool struct
+    bm->mgmtData->rplcStratStruct = clockInfo;
+
+    //initialize the attributes of the clockInfo struct
+    bool wasReferencedArray[bm->numPages];
+    for(int i = 0; i < bm->numPages; i++)
+        wasReferencedArray[i] = false;
+    clockInfo->wasReferencedArray = wasReferencedArray;
+    clockInfo->curPage = 0;
+}
+
+void clockFree(BM_BufferPool *const bm){
+    free(bm->mgmtData->rplcStratStruct);
+}
+
+void clockPin(BM_BufferPool *const bm, int frameNum)
+{
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
+    clockInfo->wasReferencedArray[frameNum] = true;
+}
+
+BM_PageHandle * clockReplace(BM_BufferPool *const bm){
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
+
+    //validate that curPage <= numPages
+    clockInfo->curPage = clockInfo->curPage % bm->numPages;
+
+    //search through the poolInfo arrays to find a page with fixCount=0 and ref=false
+    while(true){
+        //returns a pointer to the first frame that has fixCount=0 and ref=false
+        if (poolInfo->fixCountArray[clockInfo->curPage] == 0 && clockInfo->wasReferencedArray == false){
+            //increment curPage to prevent always replacing the same page
+            clockInfo->curPage = (clockInfo->curPage + 1) % bm->numPages;
+            //return the frame pointer
+            return poolInfo->poolMem_ptr + clockInfo->curPage;
+        }
+
+        //reset the ref to false
+        clockInfo->wasReferencedArray[clockInfo->curPage] = false;
+        //increment to next frame (or first frame if at end)
+        clockInfo->curPage = (clockInfo->curPage + 1) % bm->numPages;
+    }
+}
+
+/*********************************************************************
+*
+*                     LFU Replacement Functions
+*
+*********************************************************************/
+void lfuInit(BM_BufferPool *bm){
+}
+
+void lfuFree(BM_BufferPool *const bm){
+}
+
+void lfuPin(BM_BufferPool *const bm, int frameNum){
+}
+
+BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
+
+    return ((void*)0);
 }

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <unistd.h>
+#include <io.h>
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
 #include "replace_strat.h"
@@ -277,11 +277,8 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page){
     if((returnCode = closePageFile(&fHandle)) != RC_OK)
         return returnCode;
 
-    //get memory address of the first page
-    BM_PoolInfo *poolInfo = bm->mgmtData;
-    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
-
     //search through the pages stored in the buffer pool for the page of interest
+    int frameNum = -1;
     if((frameNum = findFrameNumber(bm, page->pageNum)) == -1)
         return RC_BM_PAGE_NOT_FOUND;
     bm->mgmtData->isDirtyArray[frameNum] = false;
