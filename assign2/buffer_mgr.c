@@ -8,8 +8,11 @@
 
 //PROTOTYPES
 RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * stratData);
-RC initRelpacementStrategy(BM_PoolInfo * pi,ReplacementStrategy strategy,void *stratData);
+RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void *stratData);
 RC freeReplacementStrategy(BM_BufferPool *const bm);
+
+//Prototypes helper functions
+int findFrameNumber(BM_BufferPool * bm, PageNumber pageNumber);
 /*********************************************************************
 *
 *             BUFFER MANAGER INTERFACE POOL HANDLING
@@ -70,15 +73,17 @@ RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * str
     //allocate memory for pageFrames
     pi->poolMem_ptr = malloc(sizeof(BM_PageHandle)*bm->numPages);
     bm->mgmtData = pi;
-    return initRelpacementStrategy(pi, strategy, stratData);
+    return initRelpacementStrategy(bm, strategy, stratData);
 }
 
 
-RC initRelpacementStrategy(BM_PoolInfo * pi,ReplacementStrategy strategy,void *stratData){
+RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void *stratData){
+    RC rc;
     switch(strategy){
     case RS_FIFO:
         break;
     case RS_LRU:
+        lruInit(bm);
         break;
     case RS_CLOCK:
         break;
@@ -139,6 +144,7 @@ RC freeReplacementStrategy(BM_BufferPool *const bm){
     case RS_FIFO:
         break;
     case RS_LRU:
+        lruFree(bm);
         break;
     case RS_CLOCK:
         break;
@@ -153,6 +159,26 @@ RC freeReplacementStrategy(BM_BufferPool *const bm){
     return RC_OK;
 }
 
+
+/*********************************************************************
+Helper function to find the frame number for given pageNumber in
+a buffer pool
+*********************************************************************/
+int findFrameNumber(BM_BufferPool * bm, PageNumber pageNumber){
+    //get memory address of the first page
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
+
+    //search through the pages stored in the buffer pool for the page of interest
+    for (int i = 0; i < bm->numPages; i++){
+        frame_ptr += i; //address of the ith frame
+        if (frame_ptr->pageNum == pageNumber){
+            //mark page as dirty
+            return i;
+        }
+    }
+    return -1;
+}
 /*********************************************************************
 forceFlushPool causes all dirty pages (with fix count 0) from the
 buffer pool to be written to disk.
@@ -183,12 +209,14 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     //for the frame you're pinning the page into
     //frameNum is a place holder for however you're going to track what
     //frame you're putting the data into
-    int frameNum = 0;
-    if(bm->strategy == RS_CLOCK){
-        BM_PoolInfo *poolInfo = bm->mgmtData;
-        RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
-
-        clockInfo->wasReferencedArray[frameNum] = true;
+    int frameNum = findFrameNumber(bm,pageNum);
+    switch(bm->strategy){
+        case RS_CLOCK:
+            clockPin(bm,frameNum);
+            break;
+        case RS_LRU:
+            lruPin(bm,frameNum);
+            break;
     }
 
     return RC_OK;

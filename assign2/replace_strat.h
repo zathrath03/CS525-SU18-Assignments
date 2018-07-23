@@ -1,5 +1,14 @@
 #include <stdbool.h>
 
+//LRU
+int lruFindToReplace(BM_BufferPool *const bm);
+void lruFree(BM_BufferPool *const bm);
+void lruPin(BM_BufferPool * bm,int frameNumber);
+BM_PageHandle * lruReplace(BM_BufferPool *const bm);
+void lruInit(BM_BufferPool * bm);
+
+void clockPin(BM_BufferPool *const bm, PageNumber pageNumber);
+
 typedef struct listNode {
     BM_PageHandle pageHandle;
     struct listNode *nextNode;

@@ -11,7 +11,7 @@
 // var to store the current test's name
 char *testName;
 
-// check whether two the content of a buffer pool is the same as an expected content 
+// check whether two the content of a buffer pool is the same as an expected content
 // (given in the format produced by sprintPoolContent)
 #define ASSERT_EQUALS_POOL(expected,bm,message)			        \
   do {									\
@@ -39,8 +39,8 @@ static void testFIFO (void);
 static void testLRU (void);
 
 // main method
-int 
-main (void) 
+int
+main (void)
 {
   initStorageManager();
   testName = "";
@@ -49,6 +49,7 @@ main (void)
   testReadPage();
   testFIFO();
   testLRU();
+  return 0;
 }
 
 // create n pages with content "Page X" and read them back to check whether the content is right
@@ -73,14 +74,14 @@ testCreatingAndReadingDummyPages (void)
 }
 
 
-void 
+void
 createDummyPages(BM_BufferPool *bm, int num)
 {
   int i;
   BM_PageHandle *h = MAKE_PAGE_HANDLE();
 
   CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
-  
+
   for (i = 0; i < num; i++)
     {
       CHECK(pinPage(bm, h, i));
@@ -94,7 +95,7 @@ createDummyPages(BM_BufferPool *bm, int num)
   free(h);
 }
 
-void 
+void
 checkDummyPages(BM_BufferPool *bm, int num)
 {
   int i;
@@ -128,7 +129,7 @@ testReadPage ()
 
   CHECK(createPageFile("testbuffer.bin"));
   CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
-  
+
   CHECK(pinPage(bm, h, 0));
   CHECK(pinPage(bm, h, 0));
 
@@ -152,11 +153,11 @@ void
 testFIFO ()
 {
   // expected results
-  const char *poolContents[] = { 
-    "[0 0],[-1 0],[-1 0]" , 
-    "[0 0],[1 0],[-1 0]", 
-    "[0 0],[1 0],[2 0]", 
-    "[3 0],[1 0],[2 0]", 
+  const char *poolContents[] = {
+    "[0 0],[-1 0],[-1 0]" ,
+    "[0 0],[1 0],[-1 0]",
+    "[0 0],[1 0],[2 0]",
+    "[3 0],[1 0],[2 0]",
     "[3 0],[4 0],[2 0]",
     "[3 0],[4 1],[2 0]",
     "[3 0],[4 1],[5x0]",
@@ -207,7 +208,7 @@ testFIFO ()
   h->pageNum = 4;
   unpinPage(bm, h);
   ASSERT_EQUALS_POOL(poolContents[i],bm,"unpin last page");
-  
+
   i++;
   forceFlushPool(bm);
   ASSERT_EQUALS_POOL(poolContents[i],bm,"pool content after flush");
@@ -229,10 +230,10 @@ void
 testLRU (void)
 {
   // expected results
-  const char *poolContents[] = { 
+  const char *poolContents[] = {
     // read first five pages and directly unpin them
-    "[0 0],[-1 0],[-1 0],[-1 0],[-1 0]" , 
-    "[0 0],[1 0],[-1 0],[-1 0],[-1 0]", 
+    "[0 0],[-1 0],[-1 0],[-1 0],[-1 0]" ,
+    "[0 0],[1 0],[-1 0],[-1 0],[-1 0]",
     "[0 0],[1 0],[2 0],[-1 0],[-1 0]",
     "[0 0],[1 0],[2 0],[3 0],[-1 0]",
     "[0 0],[1 0],[2 0],[3 0],[4 0]",
