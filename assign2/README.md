@@ -77,14 +77,28 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page);
 ```c
 RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page);
 ```
-*marks a page as dirty.*
+*marks a page as dirty*
+
+* validates input by verifying that neither the BufferPool nor the PageHandle are null
+* uses findFrameNumber() to find which frame has the page pinned in it
+* updates the isDirtyArray for the appropriate frame
+* returns RC_BM_PAGE_NOT_FOUND if the requested page isn't pinned in a frame
 
 #### forcePage
 
 ```c
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page);
 ```
-*should write the current content of the page back to the page file on disk.*
+*writes the current content of the page back to the page file on disk*
+
+* validates input by verifying that neither the BufferPool nor the PageHandle are null
+* initializes a SM_FileHandle in which to store the file data from the storage manager
+* opens the page file specified by bm->pageFile and stores its data in fHandle
+	* returns an error return code if openPageFile() does not return RC_OK
+* write the data from the page to the appropriate block on disk using writeBlock()
+	* returns an error return code if writeBlock() does not return RC_OK
+* close the page file & return the error if closePageFile() does not return RC_OK
+* locate the frame with the page pinned in it and reset its dirty flag to false
 
 ### Statistics Interface
 
@@ -129,10 +143,9 @@ int getNumWriteIO (BM_BufferPool *const bm);
 
 ### Clock
 
-The clock algorithm is a commonly implemented, efficient approximation to LRU. The frames are conceptually arranged in a circle with a hand pointing to one of the frames. The hand rotates clockwise if it needs to find a frame in which to place a disk block. Each frame has an associated flag which is either true or false. When a page is read into a frame or when the contents of a frame are accessed, its flag is set to true. When the buffer manager needs to buffer a new block, it looks for the first 0 it can find, rotating clockwise. If it passes flags that are set to true, it sets them to false. Frames with a false flag are vulnerable to having their contents sent back to disk; frames with a true flag are not. Thus, a page is only thrown out of its frame if it remains unaccessed for the time it takes the hand to make a complete rotation to set its flag to false, and then make another complete roatation to find the frame with its false flag unchanged.
+*The clock algorithm is a commonly implemented, efficient approximation to LRU. The frames are conceptually arranged in a circle with a hand pointing to one of the frames. The hand rotates clockwise if it needs to find a frame in which to place a disk block. Each frame has an associated flag which is either true or false. When a page is read into a frame or when the contents of a frame are accessed, its flag is set to true. When the buffer manager needs to buffer a new block, it looks for the first 0 it can find, rotating clockwise. If it passes flags that are set to true, it sets them to false. Frames with a false flag are vulnerable to having their contents sent back to disk; frames with a true flag are not. Thus, a page is only thrown out of its frame if it remains unaccessed for the time it takes the hand to make a complete rotation to set its flag to false, and then make another complete roatation to find the frame with its false flag unchanged.*
 
 #### ClockInfo Structure
-
 ```c
 typedef struct RS_ClockInfo {
     bool *wasReferencedArray;
@@ -169,6 +182,15 @@ BM_PageHandle clockReplace (BM_BufferPool *const bm);
 Implements the replacement strategy.
 
 * Uses curFrame % numPages to loop back to the first index upon reaching the end
-
+* Loops continuously through the fixCountArray and wasReferenced array until it locates one with fixCount == 0 and wasRef == false
+* Uses pointer arithmetic to iterate through the arrays
+* Returns a pointer to the first frame encountered with fixCount == 0 and wasRef == false
+* Sets wasRef to false for every frame encountered
+* Will return the first empty frame if not all frames are full since an empty frame will always have fixCount == 0 and wasRef == false
+* Would be better implemented with threading
+	* There is currently the possiblity for deadlock since threading isn't implemented
+	* Could lead to an infinite loop if all the frames are pinned by the same program that is attempting to pin a new page
+	* In the case of all frames being pinned (fixCount > 0), clockReplace with a while(true) loops forever
+	* Program can't unpin a frame due to clockReplace looking for an unpinned frame
 
 ## Testing
