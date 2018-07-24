@@ -58,20 +58,29 @@ RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * str
     pi->numReadIO = 0;
     pi->numWriteIO = 0;
 
-    //Set the isDirtyArray,fixCountArray to false,0
-    bool isDirtyArray[bm->numPages];
+    //Set the isDirtyArray false
+    bool * isDirtyArray = (bool *)malloc(sizeof(bool)*bm->numPages);
     for(int i =0; i <bm->numPages;i++){
         isDirtyArray[i]=false;
     }
     pi->isDirtyArray = isDirtyArray;
-    int fixCountArray[bm->numPages];
+
+    //Set the fixCountArray to 0
+    int * fixCountArray = (int *)malloc(sizeof(int)*bm->numPages);
     for(int i; i<bm->numPages;i++){
         fixCountArray[i]=0;
     }
     pi->fixCountArray = fixCountArray;
 
+    //Set the frameContent to NO_PAGE
+    int * frameContent = (int *)malloc(sizeof(int)*bm->numPages);
+    for(int i; i<bm->numPages;i++){
+        frameContent[i]=NO_PAGE;
+    }
+    pi->frameContent = frameContent;
+
     //allocate memory for pageFrames
-    pi->poolMem_ptr = malloc(sizeof(BM_PageHandle)*bm->numPages);
+    pi->poolMem_ptr = (BM_PageHandle *)malloc(sizeof(BM_PageHandle)*bm->numPages);
     bm->mgmtData = pi;
     return initRelpacementStrategy(bm, strategy, stratData);
 }
@@ -80,13 +89,16 @@ RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * str
 RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void *stratData){
     switch(strategy){
     case RS_FIFO:
+        fifoInit(bm);
         break;
     case RS_LRU:
         lruInit(bm);
         break;
     case RS_CLOCK:
+        clockInit(bm);
         break;
     case RS_LFU:
+        lfuInit(bm);
         break;
     case RS_LRU_K:
         break;
@@ -118,19 +130,19 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
     }
     //free up space from pageFrames
     BM_PoolInfo *poolInfo = bm->mgmtData;
-    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
-
-    for (int i = 0; i < bm->numPages; i++)
-    {
-        frame_ptr += i; //address of the ith frame
-        free(frame_ptr);
-    }
+    //free up pool info
+    free(poolInfo->poolMem_ptr)
+    free(poolInfo->isDirtyArray);
+    free(poolInfo->fixCountArray);
+    free(poolInfo->frameContent);
+    free(poolInfo);
+    //free up replacement Strategy
     if((rc = freeReplacementStrategy(bm))!=RC_OK){
         return rc;
     }
-    free(poolInfo);
+    //free up buffer manager
     free(bm);
-    return RC_OK;
+    return rc;
 }
 
 
@@ -141,13 +153,16 @@ RC freeReplacementStrategy(BM_BufferPool *const bm){
     ReplacementStrategy strategy = bm->strategy;
     switch(strategy){
     case RS_FIFO:
+        fifoFree(bm);
         break;
     case RS_LRU:
         lruFree(bm);
         break;
     case RS_CLOCK:
+        clockFree(bm);
         break;
     case RS_LFU:
+        lfuFree(bm);
         break;
     case RS_LRU_K:
         break;
@@ -202,15 +217,13 @@ responsible to set the pageNum field of the page handle passed to the
 method. Similarly, the data field should point to the page frame the
 page is stored in (the area in memory storing the content of the
 page).
+NOTE:--------------------------------------------------------------
+Please make sure to update the frameContent in the BM_PoolInfo on the
+BM_BufferPool
 *********************************************************************/
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     PageNumber pageNum){
 
-    //When you pin the page, if bm->strategy is clock, I need you to
-    //set the bm->mgmtData->rplcStratStruct->wasReferencedArray to true
-    //for the frame you're pinning the page into
-    //frameNum is a place holder for however you're going to track what
-    //frame you're putting the data into
     int frameNum = findFrameNumber(bm,pageNum);
     switch(bm->strategy) {
     case RS_FIFO:
@@ -366,17 +379,18 @@ int getNumWriteIO (BM_BufferPool *const bm){
 
 /*********************************************************************
 Helper function to find the frame number for given pageNumber in
-a buffer pool
+a buffer pool. If a page number doesn't exist then the function will
+return NO_PAGE = -1.
 *********************************************************************/
 int findFrameNumber(BM_BufferPool * bm, PageNumber pageNumber){
-    //get memory address of the first pagefor
-    BM_PageHandle *frame_ptr = bm->mgmtData->poolMem_ptr;
+    //get memory address frameContentArray
+    int *frameContent = bm->mgmtData->frameContent;
 
-    //search through the pages stored in the buffer pool for the page of interest
+    //search through the pages stored in the buffer pool
+    //for the page of interest
     for (int i = 0; i < bm->numPages; i++){
-        //frame_ptr+i is the address of the ith frame
-        if ((frame_ptr+i)->pageNum == pageNumber)
+        if (frameContent[i] == pageNumber)
             return i;
     }
-    return -1;
+    return NO_PAGE;
 }

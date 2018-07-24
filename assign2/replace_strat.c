@@ -41,6 +41,10 @@ BM_PageHandle * fifoReplace(BM_BufferPool *const bm){
 *
 *                     LRU Replacement Functions
 *
+******************                              *********************
+This implementation is based on Modern Operating Systems, 2nd Edition
+By Andrew S. Tanenbaum. Check Link Below:
+http://www.informit.com/articles/article.aspx?p=25260&seqNum=7
 *********************************************************************/
 BM_PageHandle * lruReplace(BM_BufferPool *const bm){
     BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
@@ -51,10 +55,8 @@ BM_PageHandle * lruReplace(BM_BufferPool *const bm){
 
 void lruInit(BM_BufferPool * bm){
     int **matrix = (int**) malloc(bm->numPages*(sizeof(int *)));
-    for(int c = 0; c<bm->numPages;c++){
-        matrix[c]=(int*)malloc((bm->numPages*(sizeof(int*))));
-    }
-    for(int i = 0; i <bm->numPages;i++){
+    for(int i = 0; c<bm->numPages;c++){
+        matrix[i]=(int*)malloc((bm->numPages*(sizeof(int*))));
         for(int j = 0; j <bm->numPages;j++){
             matrix[i][j] = 0;
         }
@@ -64,11 +66,11 @@ void lruInit(BM_BufferPool * bm){
 
 void lruPin(BM_BufferPool * bm,int frameNumber){
     int **matrix = (int **) bm->mgmtData->rplcStratStruct;
-    //set the row to 1
+    //set the row of the frameNumber to 1
     for(int i=0;i<bm->numPages;i++){
         matrix[frameNumber][i]=1;
     }
-    //set the column to 0
+    //set the column of the frameNumber to 0
     for(int i=0;i<bm->numPages;i++){
         matrix[i][frameNumber]=0;
     }
@@ -76,6 +78,11 @@ void lruPin(BM_BufferPool * bm,int frameNumber){
 
 void lruFree(BM_BufferPool * bm){
     int **matrix = (int **) bm->mgmtData->rplcStratStruct;
+    //free all row arrays
+    for(int c = 0; c<bm->numPages;c++){
+        free(matrix[c]);
+    }
+    //free the main pointer
     free(matrix);
 }
 

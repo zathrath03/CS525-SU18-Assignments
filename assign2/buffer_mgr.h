@@ -29,6 +29,7 @@ typedef struct BM_PoolInfo {
     int numWriteIO; //track number of pages written to disk since initialization
     bool *isDirtyArray; //array that tracks the dirty state of each frame
     int *fixCountArray; //array that tracks the fixCount of each frame
+    int *frameContent; //array that tracks the pageNumber for every frame
     void *rplcStratStruct; //contains data needed for replacement strategy
 } BM_PoolInfo;
 
