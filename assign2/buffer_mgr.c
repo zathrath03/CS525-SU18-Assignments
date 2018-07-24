@@ -176,33 +176,31 @@ RC freeReplacementStrategy(BM_BufferPool *const bm){
 /*********************************************************************
 forceFlushPool causes all dirty pages (with fix count 0) from the
 buffer pool to be written to disk.
-
-typedef struct BM_PoolInfo {
-    BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
-    int numReadIO; //track number of pages read from disk since initialization
-    int numWriteIO; //track number of pages written to disk since initialization
-    bool *isDirtyArray; //array that tracks the dirty state of each frame
-    int *fixCountArray; //array that tracks the fixCount of each frame
-    void *rplcStratStruct; //contains data needed for replacement strategy
-} BM_PoolInfo;
 *********************************************************************/
 RC forceFlushPool(BM_BufferPool *const bm){
+    //Utilize for creating and writing to disk
+    SM_FileHandle fHandle;
+    RC returnCode =  RC_OK;
     //get memory address of the first page
     BM_PoolInfo *poolInfo = bm->mgmtData;
     BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
+    //openPageFile called
+    if((returnCode = openPageFile(bm->pageFile, &fHandle)) != RC_OK)
+        return returnCode;
 
-    //search through the pages stored in the buffer pool for the page of interest
+    //iterate through the pages stored in the buffer pool for the page of interest
     for (int i = 0; i < bm->numPages; i++){
-        frame_ptr += i; //address of the ith frame
         if ((poolInfo->fixCountArray[i] == 0) && (poolInfo->isDirtyArray[i]==true)){
-            //once the page with dirty bit true and fix count =0 is found,
-            //write its information to the disk
+            //once the page with dirty bit true and fix count=0 is found,
+            //write block of data to the page file on disk
+            if((returnCode = writeBlock((frame_ptr+i)->pageNum, &fHandle, (frame_ptr+i)->data)) != RC_OK)
+              return returnCode;
             (poolInfo->isDirtyArray[i]) = false;
             (poolInfo->numWriteIO)++;
-            return RC_OK;
         }
     }
-    return RC_OK;
+    returnCode = closePageFile(&fHandle);
+    return returnCode;
 }
 
 /*********************************************************************
@@ -318,22 +316,7 @@ the ith page frame. An empty page frame is represented using the
 constant NO_PAGE.
 *********************************************************************/
 PageNumber *getFrameContents (BM_BufferPool *const bm){
-    //Create a frameContents array to hold all of the page numbers we need
-    PageNumber frameContents[bm->numPages];
-    BM_PoolInfo *poolInfo = bm->mgmtData;
-    BM_PageHandle *frame_ptr = poolInfo->poolMem_ptr;
-
-  	//iterate through the frames
-    for (int i = 0; i < bm->numPages; i++){
-      	//Stores frame pointer into pageHandle in the BM_pageHandle struct
-      	BM_PageHandle *pageHandle = (frame_ptr+i);
-      	//if the pageHandle doesn't exist then set it to NO_PAGE
-      	if (!pageHandle)
-          frameContents[i] = NO_PAGE;
-      	else //If pageHandle exists, then set frame contents at the ith position to page number of that pageHandle
-          frameContents[i] = pageHandle->pageNum;
-    }
-    return (PageNumber*) *frameContents;
+    return (PageNumber*) bm->mgmtData->frameContent;
 }
 
 /*********************************************************************
