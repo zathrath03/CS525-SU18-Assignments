@@ -117,6 +117,7 @@ int lruFindToReplace(BM_BufferPool *const bm){
 void clockInit(BM_BufferPool *bm){
     //allocate memory for the RS_ClockInfo struct
     RS_ClockInfo *clockInfo = ((RS_ClockInfo *) malloc (sizeof(RS_ClockInfo)));
+    clockInfo->wasReferencedArray = ((bool *) malloc (bm->numPages * sizeof(bool)));
 
     //Store a reference to clockInfo in the BufferPool struct
     bm->mgmtData->rplcStratStruct = clockInfo;
