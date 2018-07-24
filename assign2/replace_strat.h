@@ -37,7 +37,7 @@ typedef struct RS_FIFOInfo {
 
 typedef struct RS_ClockInfo {
     bool *wasReferencedArray;
-    int curPage;
+    int curFrame;
 } RS_ClockInfo;
 
 typedef struct RS_LFUInfo {

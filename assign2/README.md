@@ -129,10 +129,46 @@ int getNumWriteIO (BM_BufferPool *const bm);
 
 ### Clock
 
+The clock algorithm is a commonly implemented, efficient approximation to LRU. The frames are conceptually arranged in a circle with a hand pointing to one of the frames. The hand rotates clockwise if it needs to find a frame in which to place a disk block. Each frame has an associated flag which is either true or false. When a page is read into a frame or when the contents of a frame are accessed, its flag is set to true. When the buffer manager needs to buffer a new block, it looks for the first 0 it can find, rotating clockwise. If it passes flags that are set to true, it sets them to false. Frames with a false flag are vulnerable to having their contents sent back to disk; frames with a true flag are not. Thus, a page is only thrown out of its frame if it remains unaccessed for the time it takes the hand to make a complete rotation to set its flag to false, and then make another complete roatation to find the frame with its false flag unchanged.
+
+#### ClockInfo Structure
+
 ```c
-BM_PageHandle Clock (BM_BufferPool *const bm);
+typedef struct RS_ClockInfo {
+    bool *wasReferencedArray;
+    int curFrame;
+} RS_ClockInfo;
 ```
 
-*traverses through the frames*
+RS_ClockInfo maintains an array indexed by frame number that tracks if a frame has been refrenced since last being evaluated for replacement. Also maintains an int corresponding to the frame number that is currently being evaluated for replacement.
+
+#### Clock Replacement Implementation Functions
+
+##### clockInit
+```c
+void clockInit(BM_BufferPool *bm);
+```
+Allocates memory and initializes the RS_ClockInfo struct. Does not perform any input validation.
+
+##### clockFree
+```c
+void clockFree(BM_BufferPool *const bm);
+```
+Frees memory allocated to the wasReferencedArray and the RS_ClockInfo struct. Does not perform input validation.
+
+##### clockPin
+```c
+void clockPin(BM_BufferPool *const bm, int frameNum);
+```
+Sets the flag at index frameNum stored in wasReferencedArray to true to indicate that the frame has been referenced. Does not perform input validation.
+
+##### clockReplace
+```c
+BM_PageHandle clockReplace (BM_BufferPool *const bm);
+```
+Implements the replacement strategy.
+
+* Uses curFrame % numPages to loop back to the first index upon reaching the end
+
 
 ## Testing
