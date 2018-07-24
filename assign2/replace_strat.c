@@ -55,7 +55,7 @@ BM_PageHandle * lruReplace(BM_BufferPool *const bm){
 
 void lruInit(BM_BufferPool * bm){
     int **matrix = (int**) malloc(bm->numPages*(sizeof(int *)));
-    for(int i = 0; c<bm->numPages;c++){
+    for(int i = 0; i<bm->numPages;i++){
         matrix[i]=(int*)malloc((bm->numPages*(sizeof(int*))));
         for(int j = 0; j <bm->numPages;j++){
             matrix[i][j] = 0;

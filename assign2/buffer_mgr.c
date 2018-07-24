@@ -131,7 +131,7 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
     //free up space from pageFrames
     BM_PoolInfo *poolInfo = bm->mgmtData;
     //free up pool info
-    free(poolInfo->poolMem_ptr)
+    free(poolInfo->poolMem_ptr);
     free(poolInfo->isDirtyArray);
     free(poolInfo->fixCountArray);
     free(poolInfo->frameContent);

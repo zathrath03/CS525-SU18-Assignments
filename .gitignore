@@ -1,9 +1,0 @@
-*.cbp
-*.depend
-*.layout
-*.bin
-*.o
-bin/
-obj/
-assign1/main.c
-assign1/assign1.cbp.save-failed
