@@ -117,23 +117,30 @@ int lruFindToReplace(BM_BufferPool *const bm){
 void clockInit(BM_BufferPool *bm){
     //allocate memory for the RS_ClockInfo struct
     RS_ClockInfo *clockInfo = ((RS_ClockInfo *) malloc (sizeof(RS_ClockInfo)));
-    clockInfo->wasReferencedArray = ((bool *) malloc (bm->numPages * sizeof(bool)));
-
+    //verify valid memory allocation
+    if(clockInfo == NULL){
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
+    //allocate memory for the bool array and initialize to false
+    clockInfo->wasReferencedArray = ((bool *) calloc (bm->numPages, sizeof(bool)));
+    //verify valid memory allocation
+    if(clockInfo->wasReferencedArray == NULL){
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
     //Store a reference to clockInfo in the BufferPool struct
     bm->mgmtData->rplcStratStruct = clockInfo;
-
     //initialize the attributes of the clockInfo struct
-    bool wasReferencedArray[bm->numPages];
-    for(int i = 0; i < bm->numPages; i++)
-        wasReferencedArray[i] = false;
-    clockInfo->wasReferencedArray = wasReferencedArray;
     clockInfo->curFrame = 0;
 }
 
 void clockFree(BM_BufferPool *const bm){
     RS_ClockInfo *clockInfo = bm->mgmtData->rplcStratStruct;
     free(clockInfo->wasReferencedArray);
+    clockInfo->wasReferencedArray = NULL;
     free(clockInfo);
+    bm->mgmtData->rplcStratStruct = NULL;
 }
 
 void clockPin(BM_BufferPool *const bm, int frameNum)

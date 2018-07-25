@@ -179,7 +179,7 @@ Sets the flag at index frameNum stored in wasReferencedArray to true to indicate
 ```c
 BM_PageHandle clockReplace (BM_BufferPool *const bm);
 ```
-Implements the replacement strategy.
+Implements the replacement strategy. Does not perform input validation.
 
 * Uses curFrame % numPages to loop back to the first index upon reaching the end
 * Loops continuously through the fixCountArray and wasReferenced array until it locates one with fixCount == 0 and wasRef == false
