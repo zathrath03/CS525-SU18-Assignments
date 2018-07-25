@@ -24,17 +24,76 @@ See LRU below as example
 *
 *********************************************************************/
 void fifoInit(BM_BufferPool *bm){
+	RS_FIFOInfo *fifoInfo = ((RS_FIFOInfo *) malloc (sizeof(RS_FIFOInfo)));
+
+	if (fifoInfo == NULL){
+		printError(RC_BM_MEMORY_ALOC_FAIL);
+		exit(-1);
+	}
+
+	fifoInfo->head = NULL;
+	fifoInfo->tail = NULL;
+
+	bm->mgmtData->rplcStratStruct = fifoInfo;
+
 }
 
 void fifoFree(BM_BufferPool *const bm){
+	RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct = fifoInfo;
+	listNode *curr = fifoInfo->head;
+	while(curr != NULL){
+		curr = curr->nextNode;
+		free(curr);
+	}
+	free(curr);
+	free(fifoInfo);
 }
 
 void fifoPin(BM_BufferPool *bm, int frameNum){
+	BM_PoolInfo *poolInfo = bm->mgmtData;
+	RS_FIFOInfo *fifoInfo = poolInfo->rplcStratStruct;
+
+	listNode *node = ((listNode *) malloc (sizeof(listNode)));
+	node->nextNode = NULL;
+	if(fifoInfo->head == NULL){
+		node->nextNode = NULL;
+		fifoInfo->head = node;
+		fifoInfo->tail = node;
+	}
+	else{
+		node->nextNode = NULL;
+		fifoInfo->tail = node;
+	}
 }
 
 BM_PageHandle * fifoReplace(BM_BufferPool *const bm){
+	BM_PoolInfo *poolInfo = bm->mgmtData;
+	//BM_PageHandle* ph = poolInfo->poolMem_ptr;
+	RS_FIFOInfo *fifoInfo = poolInfo->rplcStratStruct;
 
-    return ((void*)0);
+	listNode *prev = fifoInfo->head;
+	listNode *curr = prev->nextNode;
+	if(curr == NULL){
+		int frameNum = prev->frameNum;
+		if(bm->mgmtData->fixCountArray[frameNum] == 0){
+			return bm->mgmtData->poolMem_ptr + frameNum;
+		}
+	}
+	else{
+		while(curr != NULL){
+
+			int frameNum = curr->frameNum;
+			if(bm->mgmtData->fixCountArray[frameNum] == 0){
+				prev->nextNode = curr->nextNode;
+				return bm->mgmtData->poolMem_ptr + frameNum;
+			}
+
+			prev = curr;
+			curr = curr->nextNode;
+
+		}
+	}
+    return NULL;
 }
 
 /*********************************************************************
