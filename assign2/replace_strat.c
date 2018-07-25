@@ -49,6 +49,10 @@ http://www.informit.com/articles/article.aspx?p=25260&seqNum=7
 BM_PageHandle * lruReplace(BM_BufferPool *const bm){
     BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
     int PageNumber = lruFindToReplace(bm);
+    if(PageNumber==-1)
+    {
+        return (void *);
+    }
     ph+=PageNumber;
     return ph;
 }
@@ -89,19 +93,27 @@ void lruFree(BM_BufferPool * bm){
 //private function don't need to implement
 int lruFindToReplace(BM_BufferPool *const bm){
     int **matrix = (int **) bm->mgmtData->rplcStratStruct;
-    int minIndex;
+    int minIndex = -1;
     int minVal = -1;
     for(int i=0;i<bm->numPages;i++)
+    {
+        //Skip rows that are pinned by users
+        //i.e don't have fixCount ==0
+        if( bm->mgmtData->fixCountArray[i]!=0)
         {
+            continue;
+        }
         int rowMin = bm->numPages;
         for(int j=0;j<bm->numPages;j++)
         {
-            if(matrix[i][j]==1){
+            if(matrix[i][j]==1)
+            {
                rowMin = j;
                break;
             }
         }
-        if(rowMin<minVal || minVal ==-1){
+        if((rowMin<minVal || minVal ==-1))
+        {
             minVal = rowMin;
             minIndex = i;
         }
