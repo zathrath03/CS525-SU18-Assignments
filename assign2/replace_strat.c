@@ -39,7 +39,7 @@ void fifoInit(BM_BufferPool *bm){
 }
 
 void fifoFree(BM_BufferPool *const bm){
-	RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct = fifoInfo;
+	RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct;
 	listNode *curr = fifoInfo->head;
 	while(curr != NULL){
 		curr = curr->nextNode;
