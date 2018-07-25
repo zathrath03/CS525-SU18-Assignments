@@ -26,7 +26,8 @@ void lfuPin(BM_BufferPool *const bm, int frameNum);
 BM_PageHandle * lfuReplace(BM_BufferPool *const bm);
 
 typedef struct listNode {
-    BM_PageHandle pageHandle;
+    //BM_PageHandle pageHandle;
+    int frameNum;
     struct listNode *nextNode;
 } listNode;
 

@@ -24,17 +24,76 @@ See LRU below as example
 *
 *********************************************************************/
 void fifoInit(BM_BufferPool *bm){
+	RS_FIFOInfo *fifoInfo = ((RS_FIFOInfo *) malloc (sizeof(RS_FIFOInfo)));
+
+	if (fifoInfo == NULL){
+		printError(RC_BM_MEMORY_ALOC_FAIL);
+		exit(-1);
+	}
+
+	fifoInfo->head = NULL;
+	fifoInfo->tail = NULL;
+
+	bm->mgmtData->rplcStratStruct = fifoInfo;
+
 }
 
 void fifoFree(BM_BufferPool *const bm){
+	RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct = fifoInfo;
+	listNode *curr = fifoInfo->head;
+	while(curr != NULL){
+		curr = curr->nextNode;
+		free(curr);
+	}
+	free(curr);
+	free(fifoInfo);
 }
 
 void fifoPin(BM_BufferPool *bm, int frameNum){
+	BM_PoolInfo *poolInfo = bm->mgmtData;
+	RS_FIFOInfo *fifoInfo = poolInfo->rplcStratStruct;
+
+	listNode *node = ((listNode *) malloc (sizeof(listNode)));
+	node->nextNode = NULL;
+	if(fifoInfo->head == NULL){
+		node->nextNode = NULL;
+		fifoInfo->head = node;
+		fifoInfo->tail = node;
+	}
+	else{
+		node->nextNode = NULL;
+		fifoInfo->tail = node;
+	}
 }
 
 BM_PageHandle * fifoReplace(BM_BufferPool *const bm){
+	BM_PoolInfo *poolInfo = bm->mgmtData;
+	//BM_PageHandle* ph = poolInfo->poolMem_ptr;
+	RS_FIFOInfo *fifoInfo = poolInfo->rplcStratStruct;
 
-    return ((void*)0);
+	listNode *prev = fifoInfo->head;
+	listNode *curr = prev->nextNode;
+	if(curr == NULL){
+		int frameNum = prev->frameNum;
+		if(bm->mgmtData->fixCountArray[frameNum] == 0){
+			return bm->mgmtData->poolMem_ptr + frameNum;
+		}
+	}
+	else{
+		while(curr != NULL){
+
+			int frameNum = curr->frameNum;
+			if(bm->mgmtData->fixCountArray[frameNum] == 0){
+				prev->nextNode = curr->nextNode;
+				return bm->mgmtData->poolMem_ptr + frameNum;
+			}
+
+			prev = curr;
+			curr = curr->nextNode;
+
+		}
+	}
+    return NULL;
 }
 
 /*********************************************************************
@@ -49,6 +108,10 @@ http://www.informit.com/articles/article.aspx?p=25260&seqNum=7
 BM_PageHandle * lruReplace(BM_BufferPool *const bm){
     BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
     int PageNumber = lruFindToReplace(bm);
+    if(PageNumber==-1)
+    {
+        return ((void *)0);
+    }
     ph+=PageNumber;
     return ph;
 }
@@ -89,19 +152,27 @@ void lruFree(BM_BufferPool * bm){
 //private function don't need to implement
 int lruFindToReplace(BM_BufferPool *const bm){
     int **matrix = (int **) bm->mgmtData->rplcStratStruct;
-    int minIndex;
+    int minIndex = -1;
     int minVal = -1;
     for(int i=0;i<bm->numPages;i++)
+    {
+        //Skip rows that are pinned by users
+        //i.e don't have fixCount ==0
+        if( bm->mgmtData->fixCountArray[i]!=0)
         {
+            continue;
+        }
         int rowMin = bm->numPages;
         for(int j=0;j<bm->numPages;j++)
         {
-            if(matrix[i][j]==1){
+            if(matrix[i][j]==1)
+            {
                rowMin = j;
                break;
             }
         }
-        if(rowMin<minVal || minVal ==-1){
+        if((rowMin<minVal || minVal ==-1))
+        {
             minVal = rowMin;
             minIndex = i;
         }

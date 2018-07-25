@@ -10,6 +10,7 @@
 RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * stratData);
 RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void *stratData);
 RC freeReplacementStrategy(BM_BufferPool *const bm);
+BM_PageHandle * findEmptyFrame(BM_BufferPool *bm);
 
 //Prototypes helper functions
 int findFrameNumber(BM_BufferPool * bm, PageNumber pageNumber);
@@ -223,29 +224,102 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     PageNumber pageNum){
 
     int frameNum = findFrameNumber(bm,pageNum);
-    switch(bm->strategy) {
-    case RS_FIFO:
-        break;
-    case RS_LRU:
-        lruPin(bm,frameNum);
-        break;
-    case RS_CLOCK:
-        clockPin(bm,frameNum);
-        break;
-    case RS_LFU:
-        break;
-    case RS_LRU_K:
-        break;
+	BM_PoolInfo *poolInfo = bm->mgmtData;
+	BM_PageHandle *framePtr = poolInfo->poolMem_ptr + frameNum;
+
+    if(frameNum == -1){
+    	framePtr = findEmptyFrame(bm);
+
+    	page->pageNum = pageNum;
+    	frameNum = (framePtr - poolInfo->poolMem_ptr)/sizeof(BM_PageHandle);
+
+    	if(bm->mgmtData->isDirtyArray[frameNum] == true){
+    		forcePage(bm, framePtr);
+		}
+
+    	SM_FileHandle fHandle;
+    	RC returnCode;
+
+    	//openPageFile called
+    	if((returnCode = openPageFile(bm->pageFile, &fHandle)) != RC_OK)
+    		return returnCode;
+
+    	if((returnCode = readBlock(page->pageNum, &fHandle, page->data)) != RC_OK)
+    		return returnCode;
+
+    	if((returnCode = closePageFile(&fHandle)) != RC_OK)
+    		return returnCode;
+    	bm->mgmtData->fixCountArray[frameNum] = 0;
+
+		switch(bm->strategy) {
+		case RS_FIFO:
+			fifoPin(bm, frameNum);
+			break;
+		case RS_LRU:
+			lruPin(bm,frameNum);
+			break;
+		case RS_CLOCK:
+			clockPin(bm,frameNum);
+			break;
+		case RS_LFU:
+			lfuPin(bm, frameNum);
+			break;
+		case RS_LRU_K:
+			break;
+		}
     }
+	bm->mgmtData->frameContent[frameNum] = pageNum;
+	bm->mgmtData->fixCountArray[frameNum] += 1;
+
 
     return RC_OK;
 }
+
+BM_PageHandle * findEmptyFrame(BM_BufferPool *bm){
+	BM_PageHandle *framePtr = ((void*)0);
+	//search for empty frame
+	for(int i = 0; i < bm->numPages; i++){
+		if(bm->mgmtData->frameContent[i] == -1){
+			return bm->mgmtData->poolMem_ptr + i;
+		}
+	}
+
+	//if empty frame not found, search for replacement frame
+
+	switch(bm->strategy) {
+	case RS_FIFO:
+		framePtr = fifoReplace(bm);
+		break;
+	case RS_LRU:
+		framePtr = lruReplace(bm);
+		break;
+	case RS_CLOCK:
+		framePtr = clockReplace(bm);
+		break;
+	case RS_LFU:
+		framePtr = lfuReplace(bm);
+		break;
+	case RS_LRU_K:
+		break;
+	default:
+		break;
+	}
+
+	return framePtr;
+}
+
 
 /*********************************************************************
 unpinPage unpins the page page. The pageNum field of page should be
 used to figure out which page to unpin.
 *********************************************************************/
 RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
+
+	int frameNum = findFrameNumber(bm, page->pageNum);
+	bm->mgmtData->fixCountArray[frameNum] -= 1;
+	bm->mgmtData->isDirtyArray[frameNum] = 0;
+	bm->mgmtData->frameContent[frameNum] = 1;
+	bm->mgmtData->numReadIO += 1;
 
     return RC_OK;
 }
