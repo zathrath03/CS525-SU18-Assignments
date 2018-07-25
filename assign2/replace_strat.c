@@ -129,6 +129,7 @@ int lruFindToReplace(BM_BufferPool *const bm){
 void clockInit(BM_BufferPool *bm){
     //allocate memory for the RS_ClockInfo struct
     RS_ClockInfo *clockInfo = ((RS_ClockInfo *) malloc (sizeof(RS_ClockInfo)));
+    clockInfo->wasReferencedArray = ((bool *) malloc (bm->numPages * sizeof(bool)));
 
     //Store a reference to clockInfo in the BufferPool struct
     bm->mgmtData->rplcStratStruct = clockInfo;
@@ -184,15 +185,56 @@ BM_PageHandle * clockReplace(BM_BufferPool *const bm){
 *
 *********************************************************************/
 void lfuInit(BM_BufferPool *bm){
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    //Memory allocation needed for the lfu struct
+    RS_LFUInfo *lfuInfo = ((RS_LFUInfo *) malloc (sizeof(RS_LFUInfo)));
+    //Store a reference to lfuInfo in the BufferPool struct
+    poolInfo->rplcStratStruct = lfuInfo;
+    //frequency array: tracks all of the frequencies for pages moved to buffer pool from disk
+    int *frequency = malloc(bm->numPages*(sizeof(int)));
+    for(int i=0; i<bm->numPages; i++)
+      frequency[i] = 0;
+    lfuInfo->frequency = frequency;
+    lfuInfo->lfuIndex=0;
 }
 
 void lfuFree(BM_BufferPool *const bm){
+    //free up reference array and finally the structure itself
+    RS_LFUInfo *lfuInfo = bm->mgmtData->rplcStratStruct;
+    free(lfuInfo->frequency);
+    free(lfuInfo);
 }
 
 void lfuPin(BM_BufferPool *const bm, int frameNum){
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    RS_LFUInfo *lfuInfo = poolInfo->rplcStratStruct;
+    //frequency of that frame is increased by 1
+    lfuInfo->frequency[frameNum]++;
 }
-
+/*******************************************************
+lfuReplace function steps:
+- Iterate through the frequency array
+  - Frequency array = index is incremented by 1 each
+    time a page is pinned to that frame
+- Find minimum valued index in the frequency array
+- Store that index value into lfuIndex
+- Store lfuIndex into the pageHandle
+*******************************************************/
 BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
+    BM_PoolInfo *poolInfo = bm->mgmtData;
+    RS_LFUInfo *lfuInfo = poolInfo->rplcStratStruct;
+    BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
+    //now just go through frequency array and look for min value and replace it with a new page.
 
-    return ((void*)0);
+    //If page frames are full, then look for minimum value in frequency and replace that page frame with the new page
+    //that we want to add.
+    lfuInfo->lfuIndex = lfuInfo->frequency[0];
+      for(int j = 1; j< bm->numPages; j++){
+        if(lfuInfo->frequency[j] > 0 && lfuInfo->frequency[j] < lfuInfo->lfuIndex){
+          lfuInfo->lfuIndex = lfuInfo->frequency[j];
+        }
+      }
+    int PageNumber = lfuInfo->lfuIndex;
+    ph+=PageNumber;
+    return ph;
 }
