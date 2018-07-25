@@ -42,6 +42,12 @@ typedef struct RS_ClockInfo {
 } RS_ClockInfo;
 
 typedef struct RS_LFUInfo {
-    int *frequency;
-    int lfuIndex;
+    struct LFUnode *head;
+    struct LFUnode *tail;
 } RS_LFUInfo;
+
+typedef struct LFUnode {
+    struct LFUnode *nextNode;
+    int frequency;
+    int frameNumber;
+}LFUnode;

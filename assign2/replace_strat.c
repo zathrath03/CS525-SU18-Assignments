@@ -245,55 +245,123 @@ BM_PageHandle * clockReplace(BM_BufferPool *const bm){
 *********************************************************************/
 void lfuInit(BM_BufferPool *bm){
     BM_PoolInfo *poolInfo = bm->mgmtData;
-    //Memory allocation needed for the lfu struct
+    //Memory allocation needed for the lfuInfo struct
     RS_LFUInfo *lfuInfo = ((RS_LFUInfo *) malloc (sizeof(RS_LFUInfo)));
     //Store a reference to lfuInfo in the BufferPool struct
     poolInfo->rplcStratStruct = lfuInfo;
-    //frequency array: tracks all of the frequencies for pages moved to buffer pool from disk
-    int *frequency = malloc(bm->numPages*(sizeof(int)));
-    for(int i=0; i<bm->numPages; i++)
-      frequency[i] = 0;
-    lfuInfo->frequency = frequency;
-    lfuInfo->lfuIndex=0;
+    //Initialize head and tail to point to NULL
+    lfuInfo->head = NULL;
+    lfuInfo->tail = NULL;
 }
 
 void lfuFree(BM_BufferPool *const bm){
-    //free up reference array and finally the structure itself
+    //free up structure itself
     RS_LFUInfo *lfuInfo = bm->mgmtData->rplcStratStruct;
-    free(lfuInfo->frequency);
-    free(lfuInfo);
+  	//free every node in the list
+
+    LFUnode *node = lfuInfo->head;
+  	LFUnode *temp = node->nextNode;
+  	while(temp != NULL){
+      free(node); //Free the memory allocated by node
+      node = temp;
+      temp = temp->nextNode; //temp is now iterated to the next position in the linked list
+    } //Breaks out when temp is null
+  	free(node); //frees last node in linked list
+  	node = NULL;
+  	//free structure pointers
+    free(lfuInfo->head);
+  	lfuInfo->head = NULL;
+    free(lfuInfo->tail);
+  	lfuInfo->tail = NULL;
+  	free(lfuInfo);
+  	lfuInfo = NULL;
 }
 
 void lfuPin(BM_BufferPool *const bm, int frameNum){
     BM_PoolInfo *poolInfo = bm->mgmtData;
     RS_LFUInfo *lfuInfo = poolInfo->rplcStratStruct;
-    //frequency of that frame is increased by 1
-    lfuInfo->frequency[frameNum]++;
+    //Check if the page already exists to be safe
+    LFUnode *node = lfuInfo->head;
+    do{
+      if (node->frameNumber == frameNum){
+        //Increment that node's frequency
+        node->frequency++;
+        return;
+      }
+      else
+        node = node->nextNode;
+    }while(node->nextNode != NULL); //could also use while node != tail
+
+  	//Only arrives here if the page isn't already in the list
+    //If new node is entered then do the following
+    LFUnode *newNode = (LFUnode*)malloc(sizeof(LFUnode));
+    //newNode created and populated
+    newNode->frequency = 1;
+    newNode->frameNumber = frameNum;
+    //ordering it into linked list; both head and tail point to addr of newNode
+    if(lfuInfo->head == NULL){
+      lfuInfo->head = newNode;
+      lfuInfo->tail = newNode;
+    }
+    else{//setting tail pointer to become new newNode
+      (lfuInfo->tail)->nextNode = newNode;
+      lfuInfo->tail = newNode;
+    }
 }
-/*******************************************************
-lfuReplace function steps:
-- Iterate through the frequency array
-  - Frequency array = index is incremented by 1 each
-    time a page is pinned to that frame
-- Find minimum valued index in the frequency array
-- Store that index value into lfuIndex
-- Store lfuIndex into the pageHandle
-*******************************************************/
+
 BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
     BM_PoolInfo *poolInfo = bm->mgmtData;
     RS_LFUInfo *lfuInfo = poolInfo->rplcStratStruct;
     BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
-    //now just go through frequency array and look for min value and replace it with a new page.
-
-    //If page frames are full, then look for minimum value in frequency and replace that page frame with the new page
-    //that we want to add.
-    lfuInfo->lfuIndex = lfuInfo->frequency[0];
-      for(int j = 1; j< bm->numPages; j++){
-        if(lfuInfo->frequency[j] > 0 && lfuInfo->frequency[j] < lfuInfo->lfuIndex){
-          lfuInfo->lfuIndex = lfuInfo->frequency[j];
-        }
+    //Iterate through the linked list to find the smallest frequency value
+    LFUnode *node = lfuInfo->head; //used as node we want to return
+  	int frequency = 2147483647; //INT_MAX
+  	int frameNum = -1;
+    while(node != NULL){ //Compare the nodes frequency with the head and find the smallest frequency
+      if (node->frequency < frequency && poolInfo->fixCountArray[node->frameNumber] == 0){
+        frameNum = node->frameNumber;
+        frequency = node->frequency;
       }
-    int PageNumber = lfuInfo->lfuIndex;
-    ph+=PageNumber;
-    return ph;
+      node = node->nextNode;
+    }
+
+  	if (frameNum == -1) //there are no pinned frames with fixCount of 0
+      return ((void*)0);
+
+    //Now that we have the frame number for the correct node, we will use fifo to find the exact frame we want.
+    //If the head node is what we want:
+    node = lfuInfo->head;
+    if(node->frameNumber == frameNum){ //the head node is the one that needs to be removed
+      lfuInfo->head = node->nextNode; //moves the head pointer to the second node
+      free(node); //frees the memory allocated to the node we're replacing
+      node = NULL;
+      return ph + frameNum; //returns a pageHandle of the frame we're offering for replacement
+    }
+    //If head node wasn't the right frameNumber
+    //Iterate through the linked list till we find the correct frame.
+    while(node->nextNode->nextNode != NULL){
+      if(node->nextNode->frameNumber == frameNum){ //if correct frame is found
+        LFUnode *temp = node->nextNode;
+        node->nextNode = node->nextNode->nextNode;	//move the next nextnode to take place of the node we're removing
+        free(temp);	//Free node we want to remove
+        temp=NULL;
+        return ph + frameNum;
+      }
+      else
+        node = node->nextNode;	//If the correct node isn't found, then move to the next node and compare
+    }
+  	//We reach here only if neither the head nor the internal nodes were the right frame number
+    //If the tail is the frame we're looking for
+  	//node is pointing to the node just before the tail at this point
+    if(node->nextNode->frameNumber == frameNum){
+      LFUnode *temp = node->nextNode; //save a reference to the node we're removing for later use
+      lfuInfo->tail = node; //move the tail pointer to the node before last
+      node->nextNode = NULL; //remove the reference to the last node
+      free(temp); //free memory held by the last node
+      temp = NULL; //for safety to ensure that temp is no longer pointing at deallocated memory
+      return ph + frameNum; //returns a pageHandle of the frame we're offering for replacement
+    }
+
+  	printf("\nERROR: frame %d not found for removal from linked list in LFUReplace()\n", frameNum);
+    return ph + frameNum;
 }
