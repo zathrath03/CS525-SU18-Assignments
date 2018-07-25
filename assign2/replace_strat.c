@@ -179,7 +179,7 @@ void lfuInit(BM_BufferPool *bm){
     //Store a reference to lfuInfo in the BufferPool struct
     poolInfo->rplcStratStruct = lfuInfo;
     //frequency array: tracks all of the frequencies for pages moved to buffer pool from disk
-    int *frequency = (int *) malloc(bm->numPages*(sizeof(int *)));
+    int *frequency = malloc(bm->numPages*(sizeof(int)));
     for(int i=0; i<bm->numPages; i++)
       frequency[i] = 0;
     lfuInfo->frequency = frequency;
