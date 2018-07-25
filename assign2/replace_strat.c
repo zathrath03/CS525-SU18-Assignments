@@ -188,23 +188,30 @@ int lruFindToReplace(BM_BufferPool *const bm){
 void clockInit(BM_BufferPool *bm){
     //allocate memory for the RS_ClockInfo struct
     RS_ClockInfo *clockInfo = ((RS_ClockInfo *) malloc (sizeof(RS_ClockInfo)));
-    clockInfo->wasReferencedArray = ((bool *) malloc (bm->numPages * sizeof(bool)));
-
+    //verify valid memory allocation
+    if(clockInfo == NULL){
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
+    //allocate memory for the bool array and initialize to false
+    clockInfo->wasReferencedArray = ((bool *) calloc (bm->numPages, sizeof(bool)));
+    //verify valid memory allocation
+    if(clockInfo->wasReferencedArray == NULL){
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
     //Store a reference to clockInfo in the BufferPool struct
     bm->mgmtData->rplcStratStruct = clockInfo;
-
     //initialize the attributes of the clockInfo struct
-    bool wasReferencedArray[bm->numPages];
-    for(int i = 0; i < bm->numPages; i++)
-        wasReferencedArray[i] = false;
-    clockInfo->wasReferencedArray = wasReferencedArray;
-    clockInfo->curPage = 0;
+    clockInfo->curFrame = 0;
 }
 
 void clockFree(BM_BufferPool *const bm){
     RS_ClockInfo *clockInfo = bm->mgmtData->rplcStratStruct;
     free(clockInfo->wasReferencedArray);
+    clockInfo->wasReferencedArray = NULL;
     free(clockInfo);
+    bm->mgmtData->rplcStratStruct = NULL;
 }
 
 void clockPin(BM_BufferPool *const bm, int frameNum)
@@ -218,23 +225,23 @@ BM_PageHandle * clockReplace(BM_BufferPool *const bm){
     BM_PoolInfo *poolInfo = bm->mgmtData;
     RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
 
-    //validate that curPage <= numPages
-    clockInfo->curPage = clockInfo->curPage % bm->numPages;
+    //validate that curFrame <= numPages
+    clockInfo->curFrame = clockInfo->curFrame % bm->numPages;
 
     //search through the poolInfo arrays to find a page with fixCount=0 and ref=false
     while(true){
         //returns a pointer to the first frame that has fixCount=0 and ref=false
-        if (poolInfo->fixCountArray[clockInfo->curPage] == 0 && clockInfo->wasReferencedArray == false){
-            //increment curPage to prevent always replacing the same page
-            clockInfo->curPage = (clockInfo->curPage + 1) % bm->numPages;
+        if (poolInfo->fixCountArray[clockInfo->curFrame] == 0 && clockInfo->wasReferencedArray == false){
+            //increment curFrame to prevent always replacing the same page
+            clockInfo->curFrame = (clockInfo->curFrame + 1) % bm->numPages;
             //return the frame pointer
-            return poolInfo->poolMem_ptr + clockInfo->curPage;
+            return poolInfo->poolMem_ptr + clockInfo->curFrame;
         }
 
         //reset the ref to false
-        clockInfo->wasReferencedArray[clockInfo->curPage] = false;
+        clockInfo->wasReferencedArray[clockInfo->curFrame] = false;
         //increment to next frame (or first frame if at end)
-        clockInfo->curPage = (clockInfo->curPage + 1) % bm->numPages;
+        clockInfo->curFrame = (clockInfo->curFrame + 1) % bm->numPages;
     }
 }
 
