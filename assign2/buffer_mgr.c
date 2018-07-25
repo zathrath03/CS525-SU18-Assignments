@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include <io.h>
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
@@ -55,45 +56,53 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 
 RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * stratData){
     BM_PoolInfo * pi = MAKE_POOL_INFO();
+    if(!pi)
+        return RC_BM_MEMORY_ALOC_FAIL;
     //initialize PoolInfo values
     pi->numReadIO = 0;
     pi->numWriteIO = 0;
 
     //Set the isDirtyArray false
     bool * isDirtyArray = (bool *)malloc(sizeof(bool)*bm->numPages);
+    if(!isDirtyArray)
+        return RC_BM_MEMORY_ALOC_FAIL;
     for(int i =0; i <bm->numPages;i++){
         isDirtyArray[i]=false;
     }
     pi->isDirtyArray = isDirtyArray;
 
     //Set the fixCountArray to 0
-    int * fixCountArray = (int *)malloc(sizeof(int)*bm->numPages);
-    for(int i; i<bm->numPages;i++){
-        fixCountArray[i]=0;
-    }
+    int * fixCountArray = (int *)calloc(bm->numPages,sizeof(int));
+    if(!fixCountArray)
+        return RC_BM_MEMORY_ALOC_FAIL;
     pi->fixCountArray = fixCountArray;
 
     //Set the frameContent to NO_PAGE
     int * frameContent = (int *)malloc(sizeof(int)*bm->numPages);
-    for(int i; i<bm->numPages;i++){
-        frameContent[i]=NO_PAGE;
-    }
+    if(!frameContent)
+        return RC_BM_MEMORY_ALOC_FAIL;
+    memset(frameContent, NO_PAGE, bm->numPages*(sizeof(int)));
     pi->frameContent = frameContent;
 
     //allocate memory for pageFrames
     pi->poolMem_ptr = (BM_PageHandle *)malloc(sizeof(BM_PageHandle)*bm->numPages);
+    if(!pi->poolMem_ptr)
+        return RC_BM_MEMORY_ALOC_FAIL;
     bm->mgmtData = pi;
     return initRelpacementStrategy(bm, strategy, stratData);
 }
 
 
 RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void *stratData){
+    RC rc = RC_OK;
+    //this is a default value and should be set
+    // in the init functions below!!
     switch(strategy){
     case RS_FIFO:
         fifoInit(bm);
         break;
     case RS_LRU:
-        lruInit(bm);
+        rc = lruInit(bm);
         break;
     case RS_CLOCK:
         clockInit(bm);
@@ -107,7 +116,7 @@ RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void 
         printf("UNKNOWN REPLACEMENT STRATEGY");
         return RC_RS_UNKNOWN;
     }
-    return RC_OK;
+    return rc;
 }
 
 /*********************************************************************
@@ -133,10 +142,15 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
     BM_PoolInfo *poolInfo = bm->mgmtData;
     //free up pool info
     free(poolInfo->poolMem_ptr);
+    poolInfo->poolMem_ptr=((void *)0);
     free(poolInfo->isDirtyArray);
+    poolInfo->isDirtyArray=((void *)0);
     free(poolInfo->fixCountArray);
+    poolInfo->fixCountArray=((void *)0);
     free(poolInfo->frameContent);
+    poolInfo->frameContent=((void *)0);
     free(poolInfo);
+    poolInfo=((void *)0);
     //free up replacement Strategy
     if((rc = freeReplacementStrategy(bm))!=RC_OK){
         return rc;
