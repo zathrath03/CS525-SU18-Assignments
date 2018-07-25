@@ -51,7 +51,7 @@ BM_PageHandle * lruReplace(BM_BufferPool *const bm){
     int PageNumber = lruFindToReplace(bm);
     if(PageNumber==-1)
     {
-        return (void *);
+        return ((void *)0);
     }
     ph+=PageNumber;
     return ph;
