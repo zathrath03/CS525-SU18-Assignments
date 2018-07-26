@@ -23,8 +23,12 @@ typedef struct BM_PageHandle {
   char *data;
 } BM_PageHandle;
 
+typedef struct BM_Frame {
+    char frame[PAGE_SIZE];
+} BM_Frame;
+
 typedef struct BM_PoolInfo {
-    BM_PageHandle *poolMem_ptr; //points to the start of the pool in memory
+    BM_Frame *poolMem_ptr; //points to the start of the pool in memory
     int numReadIO; //track number of pages read from disk since initialization
     int numWriteIO; //track number of pages written to disk since initialization
     bool *isDirtyArray; //array that tracks the dirty state of each frame
@@ -41,12 +45,13 @@ typedef struct BM_BufferPool {
                   // manager needs for a buffer pool
 } BM_BufferPool;
 
+
 // convenience macros
 #define MAKE_POOL()					\
   ((BM_BufferPool *) malloc (sizeof(BM_BufferPool)))
 
 #define MAKE_POOL_INFO()            \
-    ((BM_PoolInfo *) malloc (sizeof(BM_PoolInfo)))
+    ((BM_PoolInfo *) calloc (1, sizeof(BM_PoolInfo)))
 
 #define MAKE_PAGE_HANDLE()				\
   ((BM_PageHandle *) malloc (sizeof(BM_PageHandle)))

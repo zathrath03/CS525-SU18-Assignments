@@ -3,6 +3,9 @@
 #include "buffer_mgr.h"
 #include "replace_strat.h"
 
+//Private Prototypes
+static int lruFindToReplace(BM_BufferPool *const bm);
+
 /*********************************************************************
 *
 *                   Replacement functions
@@ -24,12 +27,11 @@ See LRU below as example
 *
 *********************************************************************/
 void fifoInit(BM_BufferPool *bm){
-	RS_FIFOInfo *fifoInfo = ((RS_FIFOInfo *) malloc (sizeof(RS_FIFOInfo)));
-
-	if (fifoInfo == NULL){
-		printError(RC_BM_MEMORY_ALOC_FAIL);
-		exit(-1);
-	}
+	RS_FIFOInfo *fifoInfo = ((RS_FIFOInfo *) calloc(1, sizeof(RS_FIFOInfo)));
+	if(!fifoInfo) {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
 
 	fifoInfo->head = NULL;
 	fifoInfo->tail = NULL;
@@ -41,58 +43,47 @@ void fifoInit(BM_BufferPool *bm){
 void fifoFree(BM_BufferPool *const bm){
 	RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct;
 	listNode *curr = fifoInfo->head;
+	listNode *temp = curr;
 	while(curr != NULL){
+        temp = curr;
 		curr = curr->nextNode;
-		free(curr);
+		free(temp);
 	}
-	free(curr);
 	free(fifoInfo);
+	fifoInfo = NULL;
 }
 
 void fifoPin(BM_BufferPool *bm, int frameNum){
-	BM_PoolInfo *poolInfo = bm->mgmtData;
-	RS_FIFOInfo *fifoInfo = poolInfo->rplcStratStruct;
+    RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct;
+	listNode *newNode = (listNode*)calloc(1, sizeof(listNode));
+	if(!newNode){
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
 
-	listNode *node = ((listNode *) malloc (sizeof(listNode)));
-	node->nextNode = NULL;
+	newNode->frameNum = frameNum;
+	newNode->nextNode = NULL;
+
 	if(fifoInfo->head == NULL){
-		node->nextNode = NULL;
-		fifoInfo->head = node;
-		fifoInfo->tail = node;
+        fifoInfo->head = newNode;
+        fifoInfo->tail = newNode;
 	}
 	else{
-		node->nextNode = NULL;
-		fifoInfo->tail = node;
+        fifoInfo->tail->nextNode = newNode;
+        fifoInfo->tail = newNode;
 	}
 }
 
-BM_PageHandle * fifoReplace(BM_BufferPool *const bm){
-	BM_PoolInfo *poolInfo = bm->mgmtData;
-	//BM_PageHandle* ph = poolInfo->poolMem_ptr;
-	RS_FIFOInfo *fifoInfo = poolInfo->rplcStratStruct;
+BM_Frame * fifoReplace(BM_BufferPool *const bm){
+    RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct;
+	listNode *node = fifoInfo->head;
 
-	listNode *prev = fifoInfo->head;
-	listNode *curr = prev->nextNode;
-	if(curr == NULL){
-		int frameNum = prev->frameNum;
-		if(bm->mgmtData->fixCountArray[frameNum] == 0){
-			return bm->mgmtData->poolMem_ptr + frameNum;
-		}
+	while(node != NULL){
+        if(bm->mgmtData->fixCountArray[node->frameNum] == 0)
+            return bm->mgmtData->poolMem_ptr + node->frameNum;
+        node = node->nextNode;
 	}
-	else{
-		while(curr != NULL){
 
-			int frameNum = curr->frameNum;
-			if(bm->mgmtData->fixCountArray[frameNum] == 0){
-				prev->nextNode = curr->nextNode;
-				return bm->mgmtData->poolMem_ptr + frameNum;
-			}
-
-			prev = curr;
-			curr = curr->nextNode;
-
-		}
-	}
     return NULL;
 }
 
@@ -105,17 +96,16 @@ This implementation is based on Modern Operating Systems, 2nd Edition
 By Andrew S. Tanenbaum. Check Link Below:
 http://www.informit.com/articles/article.aspx?p=25260&seqNum=7
 *********************************************************************/
-BM_PageHandle * lruReplace(BM_BufferPool *const bm){
-    BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
+BM_Frame * lruReplace(BM_BufferPool *const bm){
+    BM_Frame* frame = bm->mgmtData->poolMem_ptr;
     int PageNumber = lruFindToReplace(bm);
     if(PageNumber==NO_PAGE)
         return NULL;
-    ph+=PageNumber;
-    return ph;
+    return frame + PageNumber;
 }
 
 void lruInit(BM_BufferPool * bm){
-    int **matrix = (int**) malloc(bm->numPages*(sizeof(int *)));
+    int **matrix = (int**) calloc(bm->numPages,(sizeof(int *)));
     if(!matrix)
     {
         printError(RC_BM_MEMORY_ALOC_FAIL);
@@ -158,7 +148,7 @@ void lruFree(BM_BufferPool * bm){
 }
 
 //private function don't need to implement
-int lruFindToReplace(BM_BufferPool *const bm){
+static int lruFindToReplace(BM_BufferPool *const bm){
     int **matrix = (int **) bm->mgmtData->rplcStratStruct;
     int minIndex = -1;
     int minVal = -1;
@@ -193,7 +183,7 @@ int lruFindToReplace(BM_BufferPool *const bm){
 *********************************************************************/
 void clockInit(BM_BufferPool *bm){
     //allocate memory for the RS_ClockInfo struct
-    RS_ClockInfo *clockInfo = ((RS_ClockInfo *) malloc (sizeof(RS_ClockInfo)));
+    RS_ClockInfo *clockInfo = ((RS_ClockInfo *) calloc (1, sizeof(RS_ClockInfo)));
     //verify valid memory allocation
     if(clockInfo == NULL){
         printError(RC_BM_MEMORY_ALOC_FAIL);
@@ -222,14 +212,12 @@ void clockFree(BM_BufferPool *const bm){
 
 void clockPin(BM_BufferPool *const bm, int frameNum)
 {
-    BM_PoolInfo *poolInfo = bm->mgmtData;
-    RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
+    RS_ClockInfo *clockInfo = bm->mgmtData->rplcStratStruct;
     clockInfo->wasReferencedArray[frameNum] = true;
 }
 
-BM_PageHandle * clockReplace(BM_BufferPool *const bm){
-    BM_PoolInfo *poolInfo = bm->mgmtData;
-    RS_ClockInfo *clockInfo = poolInfo->rplcStratStruct;
+BM_Frame * clockReplace(BM_BufferPool *const bm){
+    RS_ClockInfo *clockInfo = bm->mgmtData->rplcStratStruct;
 
     //validate that curFrame <= numPages
     clockInfo->curFrame = clockInfo->curFrame % bm->numPages;
@@ -237,11 +225,11 @@ BM_PageHandle * clockReplace(BM_BufferPool *const bm){
     //search through the poolInfo arrays to find a page with fixCount=0 and ref=false
     while(true){
         //returns a pointer to the first frame that has fixCount=0 and ref=false
-        if (poolInfo->fixCountArray[clockInfo->curFrame] == 0 && clockInfo->wasReferencedArray == false){
+        if (bm->mgmtData->fixCountArray[clockInfo->curFrame] == 0 && clockInfo->wasReferencedArray == false){
             //increment curFrame to prevent always replacing the same page
             clockInfo->curFrame = (clockInfo->curFrame + 1) % bm->numPages;
             //return the frame pointer
-            return poolInfo->poolMem_ptr + clockInfo->curFrame;
+            return (bm->mgmtData->poolMem_ptr + clockInfo->curFrame);
         }
 
         //reset the ref to false
@@ -259,7 +247,7 @@ BM_PageHandle * clockReplace(BM_BufferPool *const bm){
 void lfuInit(BM_BufferPool *bm){
     BM_PoolInfo *poolInfo = bm->mgmtData;
     //Memory allocation needed for the lfuInfo struct
-    RS_LFUInfo *lfuInfo = ((RS_LFUInfo *) malloc (sizeof(RS_LFUInfo)));
+    RS_LFUInfo *lfuInfo = ((RS_LFUInfo *) calloc(1, sizeof(RS_LFUInfo)));
     //Store a reference to lfuInfo in the BufferPool struct
     poolInfo->rplcStratStruct = lfuInfo;
     //Initialize head and tail to point to NULL
@@ -307,7 +295,11 @@ void lfuPin(BM_BufferPool *const bm, int frameNum){
 
   	//Only arrives here if the page isn't already in the list
     //If new node is entered then do the following
-    LFUnode *newNode = (LFUnode*)malloc(sizeof(LFUnode));
+    LFUnode *newNode = (LFUnode*)calloc(1, sizeof(LFUnode));
+    if(!newNode) {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
     //newNode created and populated
     newNode->frequency = 1;
     newNode->frameNumber = frameNum;
@@ -322,16 +314,15 @@ void lfuPin(BM_BufferPool *const bm, int frameNum){
     }
 }
 
-BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
-    BM_PoolInfo *poolInfo = bm->mgmtData;
-    RS_LFUInfo *lfuInfo = poolInfo->rplcStratStruct;
-    BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
+BM_Frame * lfuReplace(BM_BufferPool *const bm){
+    RS_LFUInfo *lfuInfo = bm->mgmtData->rplcStratStruct;
+    BM_Frame* framePtr = bm->mgmtData->poolMem_ptr;
     //Iterate through the linked list to find the smallest frequency value
     LFUnode *node = lfuInfo->head; //used as node we want to return
   	int frequency = 2147483647; //INT_MAX
   	int frameNum = -1;
     while(node != NULL){ //Compare the nodes frequency with the head and find the smallest frequency
-      if (node->frequency < frequency && poolInfo->fixCountArray[node->frameNumber] == 0){
+      if (node->frequency < frequency && bm->mgmtData->fixCountArray[node->frameNumber] == 0){
         frameNum = node->frameNumber;
         frequency = node->frequency;
       }
@@ -348,7 +339,7 @@ BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
       lfuInfo->head = node->nextNode; //moves the head pointer to the second node
       free(node); //frees the memory allocated to the node we're replacing
       node = NULL;
-      return ph + frameNum; //returns a pageHandle of the frame we're offering for replacement
+      return framePtr + frameNum; //returns a pageHandle of the frame we're offering for replacement
     }
     //If head node wasn't the right frameNumber
     //Iterate through the linked list till we find the correct frame.
@@ -358,7 +349,7 @@ BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
         node->nextNode = node->nextNode->nextNode;	//move the next nextnode to take place of the node we're removing
         free(temp);	//Free node we want to remove
         temp=NULL;
-        return ph + frameNum;
+        return framePtr + frameNum;
       }
       else
         node = node->nextNode;	//If the correct node isn't found, then move to the next node and compare
@@ -372,9 +363,9 @@ BM_PageHandle * lfuReplace(BM_BufferPool *const bm){
       node->nextNode = NULL; //remove the reference to the last node
       free(temp); //free memory held by the last node
       temp = NULL; //for safety to ensure that temp is no longer pointing at deallocated memory
-      return ph + frameNum; //returns a pageHandle of the frame we're offering for replacement
+      return framePtr + frameNum; //returns a pageHandle of the frame we're offering for replacement
     }
 
   	printf("\nERROR: frame %d not found for removal from linked list in LFUReplace()\n", frameNum);
-    return ph + frameNum;
+    return framePtr + frameNum;
 }

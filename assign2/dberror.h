@@ -8,6 +8,7 @@
 
 /* return code definitions */
 typedef int RC;
+#define RC_INIT -1
 
 #define RC_OK 0
 #define RC_FILE_NOT_FOUND 1
@@ -26,6 +27,7 @@ typedef int RC;
 #define RC_BM_PAGE_NOT_FOUND 100
 #define RC_BM_NOT_ALLOCATED 101
 #define RC_BM_MEMORY_ALOC_FAIL 102
+#define RC_BM_NO_FRAME_AVAIL 103
 
 #define RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE 200
 #define RC_RM_EXPR_RESULT_IS_NOT_BOOLEAN 201
