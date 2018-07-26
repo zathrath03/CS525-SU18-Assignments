@@ -54,6 +54,15 @@ RC forceFlushPool(BM_BufferPool *const bm);
 ```
 *causes all dirty pages (with fix count 0) from the buffer pool to be written to disk.*
 
+* Initializes a SM_FileHandle in which to store the file data from the storage manager
+* Opens the page file specified by bm->pageFile and stores its data in fHandle
+* Returns an error return code if openPageFile() does not return RC_OK
+* Locate a page whose fixCount is 0 and dirtyBit is True.
+* Write the data from that page to the appropriate block on disk using writeBlock()
+* Returns an error return code if writeBlock() does not return RC_OK
+* After data is written from the page to the appropriate block, set the page's dirtyBit to False and increment numWriteIO 
+* Finally, close the page file and return the error return code if closePageFile() does not return RC_OK 
+
 ### Buffer Manager Interface Access Pages
 
 *These functions are used pin pages, unpin pages, mark pages as dirty, and force a page back to disk.*
@@ -111,12 +120,16 @@ PageNumber *getFrameContents (BM_BufferPool *const bm);
 ```
 *returns an array of PageNumbers (of size numPages) where the ith element is the number of the page stored in the ith page frame. An empty page frame is represented using the constant NO_PAGE.*
 
+* Returns the frameContent array
+
 #### getDirtyFlags
 
 ```c
 bool *getDirtyFlags (BM_BufferPool *const bm);
 ```
 *returns an array of bools (of size numPages) where the ith element is TRUE if the page stored in the ith page frame is dirty. Empty page frames are considered as clean.*
+
+* Returns the isDirtyArray array
 
 #### getFixCounts
 
@@ -125,6 +138,8 @@ int *getFixCounts (BM_BufferPool *const bm);
 ```
 *returns an array of ints (of size numPages) where the ith element is the fix count of the page stored in the ith page frame. Return 0 for empty page frames.*
 
+* Returns the fixCountArray array
+
 #### getNumReadIO
 
 ```c
@@ -132,12 +147,16 @@ int getNumReadIO (BM_BufferPool *const bm);
 ```
 *returns the number of pages that have been read from disk since a buffer pool has been initialized. You code is responsible to initializing this statistic at pool creating time and update whenever a page is read from the page file into a page frame.*
 
+* Returns numReadIO
+
 #### getNumWriteIO
 
 ```c
 int getNumWriteIO (BM_BufferPool *const bm);
 ```
 *returns the number of pages written to the page file since the buffer pool has been initialized.*
+
+* Returns numWriteIO
 
 ## Page Replacement Strategies
 
@@ -192,5 +211,74 @@ Implements the replacement strategy. Does not perform input validation.
 	* Could lead to an infinite loop if all the frames are pinned by the same program that is attempting to pin a new page
 	* In the case of all frames being pinned (fixCount > 0), clockReplace with a while(true) loops forever
 	* Program can't unpin a frame due to clockReplace looking for an unpinned frame
+
+### Least Frequently Used (LFU)
+
+*The LFU algorithm is quite straight forward in its logic.  This algorithms main source of funcitonality is in finding the frequency of each page that is entered into the buffer pool. The implementation of LFU will be done using a linked list and as pages are being pinned into the linked list, we will adjust the frequency as needed. When pinning, we will check for if the page already exists in the buffer pool. If it does then we will increment its frequency, if it does not exist then the alogrithm will add that new page into the linked list after the tail, increment its frequency counter, and re-adjust the tail pointer. Now when it comes to replacing, we will iterate through the linked list until we find the frame number with the lowest frequency. Now we will check if the page we want to replace is the head of the linked list, then we will replace that node and re-adjust the pointers.  If the node we want to replace is pointed by the tail then we will replace it and re-adjust the pointers. If the node is anywhere in between the head and the tail, then we will replace that node and re-adjust the pointers. Finally we return the page handle + frameNum of that replaced page.*
+
+#### RS_LFUInfo Structure
+```c
+typedef struct RS_LFUInfo {
+    struct LFUnode *head;
+    struct LFUnode *tail;
+} RS_LFUInfo;
+```
+* RS_LFUInfo consists of a head pointer and a tail pointer which will be used to keep track of the order in which the pages come into the linked list.  These will both be of type LFUnode, which is described below:
+
+### typedef struct LFUnode Structure
+```c
+typedef struct LFUnode {
+    struct LFUnode *nextNode;
+    int frequency;
+    int frameNumber;
+}LFUnode;
+```
+* LFUnode consists of a pointer to a nodes next node called nextNode.  This will be used when iterating through the linked list of our pages.
+
+#### LFU Replacement Implementation Functions
+
+##### lfuInit
+```c
+void lfuInit(BM_BufferPool *bm);
+```
+* Allocates memory for the lfuInfo struct 
+* Sets the head of lfuInfo to point to NULL
+* Sets the tail of lfuInfo to point to NULL
+
+##### lfuFree
+```c
+void lfuFree(BM_BufferPool *const bm);
+```
+* Loop through every node in the linked list and free the memory allocated for each node
+* Free the structure pointers (head and tail)
+* Finally, free the struct itself 
+
+##### lfuPin
+```c
+void lfuPin(BM_BufferPool *const bm, int frameNum);
+```
+* Loop through linkedlist and check if the page we are pinning to the buffer pool already exists
+* If the page already exists, then increment that nodes frequency by 1 and return
+* If the page does not already exist, and it is the first page in the linkedlist, then set a head pointer and tail pointer to point to the new node
+* If the page does not already exist in the linkedlist, then add it to the tail of the linkedlist and re-adjust the pointers
+
+##### lfuReplace
+```c
+BM_PageHandle * lfuReplace(BM_BufferPool *const bm);
+```
+Implements the replacement strategy. Does not perform input validation.
+
+* Create two ints, frequency initialized to the max value of an integer and frameNum initialized to -1, which will be used to iterate through the frequencies and frameNum's of the nodes in our linkedlist
+* The node pointer is initialized to point to the head of the linkedlist
+* Loop through the nodes in the linkedlist and look for the frame with the lowest value of frequency and which have a fixCount of 0 and store that nodes frameNumber into frameNum and that nodes frequency into the frequency variables
+	* If there are no pinned frames in the linkedlist with a fixCount of 0, then return back a void pointer
+* Now that we have the frame number for the correct node we want, we will utilize the first in, first out algorithm to find the frame we want
+* We will check through the frames:
+  * If the first frame in the linkedlist is the frame that we want to replace, then we will remove that frame and re-adjust the pointers. Then return the pageHandle + frameNum.
+	* If the head node was not the correct frame, we will iterate through linkedlist to find the correct node, using a while loop
+		* Once that correct node is found, then replace that node and re-adjust the pointers. Then return the pageHandle + frameNum.
+	* If the node we want to remove is in the tail, then remove the node pointed by tail, and re-adjust the pointers. Then return the pageHandle + frameNum.
+	* If the frame is not found in the linkedlist, then return an error saying that the frame was not found and return the pageHandle + frameNum. 
+
 
 ## Testing
