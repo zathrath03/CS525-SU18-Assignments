@@ -150,14 +150,13 @@ RC shutdownBufferPool(BM_BufferPool *const bm) {
     poolInfo->fixCountArray=NULL;
     free(poolInfo->frameContent);
     poolInfo->frameContent=NULL;
-    free(poolInfo);
-    poolInfo=NULL;
     //free up replacement Strategy
     if((rc = freeReplacementStrategy(bm))!=RC_OK) {
         return rc;
     }
-    //free up buffer manager
-    free(bm);
+
+    free(poolInfo);
+    poolInfo=NULL;
     return RC_OK;
 }
 
