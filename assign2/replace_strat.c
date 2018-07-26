@@ -76,12 +76,38 @@ void fifoPin(BM_BufferPool *bm, int frameNum){
 
 BM_Frame * fifoReplace(BM_BufferPool *const bm){
     RS_FIFOInfo *fifoInfo = bm->mgmtData->rplcStratStruct;
+	BM_Frame *framePtr = bm->mgmtData->poolMem_ptr;
 	listNode *node = fifoInfo->head;
 
-	while(node != NULL){
-        if(bm->mgmtData->fixCountArray[node->frameNum] == 0)
-            return bm->mgmtData->poolMem_ptr + node->frameNum;
+	//check if head can be replaced
+    if(bm->mgmtData->fixCountArray[node->frameNum] == 0){
+        framePtr += node->frameNum;
+        fifoInfo->head = node->nextNode;
+        free(node);
+        node = NULL;
+        return framePtr;
+    }
+
+    //check if internal nodes can be replaced
+	while(node->nextNode != fifoInfo->tail){
+        if(bm->mgmtData->fixCountArray[node->nextNode->frameNum] == 0){
+            framePtr += node->nextNode->frameNum;
+            listNode *temp = node->nextNode;
+            node->nextNode = node->nextNode->nextNode;
+            free(temp);
+            temp = NULL;
+            return framePtr;
+        }
         node = node->nextNode;
+	}
+
+	//check if tail node can be replaced
+	if(bm->mgmtData->fixCountArray[fifoInfo->tail->frameNum] == 0){
+        framePtr += fifoInfo->tail->frameNum;
+        free(fifoInfo->tail);
+        fifoInfo->tail = node;
+        node->nextNode = NULL;
+        return framePtr;
 	}
 
     return NULL;
