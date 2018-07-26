@@ -284,7 +284,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     page->pageNum = pageNum;
     page->data = (char*)framePtr;
     //Calculate frameNum from framePtr to increment pool info
-    frameNum = ((framePtr - bm->mgmtData->poolMem_ptr) / sizeof(BM_Frame));
+    frameNum = ((framePtr - bm->mgmtData->poolMem_ptr));
     bm->mgmtData->fixCountArray[frameNum] = 1;
     bm->mgmtData->frameContent[frameNum] = pageNum;
 
@@ -315,8 +315,8 @@ static BM_Frame * findEmptyFrame(BM_BufferPool *bm) {
 
     //search for empty frame
     for(int i = 0; i < bm->numPages; i++) {
-        if(bm->mgmtData->frameContent[i] == -1) {
-            return bm->mgmtData->poolMem_ptr + i;
+        if(bm->mgmtData->frameContent[i] == NO_PAGE) {
+            return (bm->mgmtData->poolMem_ptr + i);
         }
     }
 
