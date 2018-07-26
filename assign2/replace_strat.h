@@ -11,7 +11,7 @@ int lruFindToReplace(BM_BufferPool *const bm);
 void lruFree(BM_BufferPool *const bm);
 void lruPin(BM_BufferPool * bm,int frameNumber);
 BM_PageHandle * lruReplace(BM_BufferPool *const bm);
-RC lruInit(BM_BufferPool * bm);
+void lruInit(BM_BufferPool * bm);
 
 //Clock
 void clockInit(BM_BufferPool *bm);

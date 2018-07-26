@@ -114,17 +114,23 @@ BM_PageHandle * lruReplace(BM_BufferPool *const bm){
     return ph;
 }
 
-RC lruInit(BM_BufferPool * bm){
+void lruInit(BM_BufferPool * bm){
     int **matrix = (int**) malloc(bm->numPages*(sizeof(int *)));
     if(!matrix)
-        return RC_BM_MEMORY_ALOC_FAIL;
+    {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
+
     for(int i = 0; i<bm->numPages;i++){
         matrix[i]=(int*)calloc(bm->numPages,sizeof(int));
-        if(!matrix)
-            return RC_BM_MEMORY_ALOC_FAIL;
+        if(!matrix[i])
+        {
+            printError(RC_BM_MEMORY_ALOC_FAIL);
+            exit(-1);
+        }
     }
     bm->mgmtData->rplcStratStruct = matrix;
-    return RC_OK;
 }
 
 void lruPin(BM_BufferPool * bm,int frameNumber){

@@ -33,22 +33,18 @@ LRU-k this could be the parameter k.
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
     const int numPages, ReplacementStrategy strategy, void *stratData){
     //check BM_BufferPool has space allocated
-    if(!bm){
+    if(!bm)
         return RC_BM_NOT_ALLOCATED;
-    }
     //check we have fileName
-    if(!pageFileName){
+    if(!pageFileName)
         return RC_NO_FILENAME;
-    }
     bm->pageFile = (char *)pageFileName;
     //check if the pageFile is a valid one
-    if(access(pageFileName, 0) == -1){
+    if(access(pageFileName, 0) == -1)
         return RC_FILE_NOT_FOUND;
-    }
     //check the number of pages
-    if(numPages<1){
+    if(numPages<1)
         return RC_INVALID_PAGE_NUMBER;
-    }
     bm->numPages = numPages;
     bm->strategy = strategy;
     return initBufferPoolInfo(bm,strategy,stratData);
@@ -57,7 +53,10 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * stratData){
     BM_PoolInfo * pi = MAKE_POOL_INFO();
     if(!pi)
-        return RC_BM_MEMORY_ALOC_FAIL;
+    {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
     //initialize PoolInfo values
     pi->numReadIO = 0;
     pi->numWriteIO = 0;
@@ -65,8 +64,12 @@ RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * str
     //Set the isDirtyArray false
     bool * isDirtyArray = (bool *)malloc(sizeof(bool)*bm->numPages);
     if(!isDirtyArray)
-        return RC_BM_MEMORY_ALOC_FAIL;
-    for(int i =0; i <bm->numPages;i++){
+    {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
+    for(int i =0; i <bm->numPages;i++)
+    {
         isDirtyArray[i]=false;
     }
     pi->isDirtyArray = isDirtyArray;
@@ -74,27 +77,35 @@ RC initBufferPoolInfo(BM_BufferPool * bm,ReplacementStrategy strategy,void * str
     //Set the fixCountArray to 0
     int * fixCountArray = (int *)calloc(bm->numPages,sizeof(int));
     if(!fixCountArray)
-        return RC_BM_MEMORY_ALOC_FAIL;
+    {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
     pi->fixCountArray = fixCountArray;
 
     //Set the frameContent to NO_PAGE
     int * frameContent = (int *)malloc(sizeof(int)*bm->numPages);
     if(!frameContent)
-        return RC_BM_MEMORY_ALOC_FAIL;
+    {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
     memset(frameContent, NO_PAGE, bm->numPages*(sizeof(int)));
     pi->frameContent = frameContent;
 
     //allocate memory for pageFrames
     pi->poolMem_ptr = (BM_PageHandle *)malloc(sizeof(BM_PageHandle)*bm->numPages);
     if(!pi->poolMem_ptr)
-        return RC_BM_MEMORY_ALOC_FAIL;
+    {
+        printError(RC_BM_MEMORY_ALOC_FAIL);
+        exit(-1);
+    }
     bm->mgmtData = pi;
     return initRelpacementStrategy(bm, strategy, stratData);
 }
 
 
 RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void *stratData){
-    RC rc = RC_OK;
     //this is a default value and should be set
     // in the init functions below!!
     switch(strategy){
@@ -102,7 +113,7 @@ RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void 
         fifoInit(bm);
         break;
     case RS_LRU:
-        rc = lruInit(bm);
+        lruInit(bm);
         break;
     case RS_CLOCK:
         clockInit(bm);
@@ -116,7 +127,7 @@ RC initRelpacementStrategy(BM_BufferPool * bm,ReplacementStrategy strategy,void 
         printf("UNKNOWN REPLACEMENT STRATEGY");
         return RC_RS_UNKNOWN;
     }
-    return rc;
+    return RC_OK;
 }
 
 /*********************************************************************
