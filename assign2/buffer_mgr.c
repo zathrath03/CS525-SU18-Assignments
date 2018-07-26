@@ -153,15 +153,15 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
     BM_PoolInfo *poolInfo = bm->mgmtData;
     //free up pool info
     free(poolInfo->poolMem_ptr);
-    poolInfo->poolMem_ptr=((void *)0);
+    poolInfo->poolMem_ptr=NULL;
     free(poolInfo->isDirtyArray);
-    poolInfo->isDirtyArray=((void *)0);
+    poolInfo->isDirtyArray=NULL;
     free(poolInfo->fixCountArray);
-    poolInfo->fixCountArray=((void *)0);
+    poolInfo->fixCountArray=NULL;
     free(poolInfo->frameContent);
-    poolInfo->frameContent=((void *)0);
+    poolInfo->frameContent=NULL;
     free(poolInfo);
-    poolInfo=((void *)0);
+    poolInfo=NULL;
     //free up replacement Strategy
     if((rc = freeReplacementStrategy(bm))!=RC_OK){
         return rc;
@@ -252,10 +252,12 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
 	BM_PoolInfo *poolInfo = bm->mgmtData;
 	BM_PageHandle *framePtr = poolInfo->poolMem_ptr + frameNum;
 
-    if(frameNum == -1){
+    if(frameNum == NO_PAGE)
+    {
     	framePtr = findEmptyFrame(bm);
 
     	page->pageNum = pageNum;
+    	page->data = malloc(sizeof(char)*PAGE_SIZE);
     	frameNum = (framePtr - poolInfo->poolMem_ptr)/sizeof(BM_PageHandle);
 
     	if(bm->mgmtData->isDirtyArray[frameNum] == true){
@@ -343,7 +345,8 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page){
 	int frameNum = findFrameNumber(bm, page->pageNum);
 	bm->mgmtData->fixCountArray[frameNum] -= 1;
 	bm->mgmtData->isDirtyArray[frameNum] = 0;
-	bm->mgmtData->frameContent[frameNum] = 1;
+	//bm->mgmtData->frameContent[frameNum] = NO_PAGE;//Not sure why you had 1 here
+	//Maybe we don't actually need the line above
 	bm->mgmtData->numReadIO += 1;
 
     return RC_OK;
@@ -363,7 +366,7 @@ RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page){
     int frameNum = 0;
 
     //search through the pages stored in the buffer pool for the page of interest
-    if((frameNum = findFrameNumber(bm, page->pageNum)) == -1)
+    if((frameNum = findFrameNumber(bm, page->pageNum)) == NO_PAGE)
         return RC_BM_PAGE_NOT_FOUND;
     bm->mgmtData->isDirtyArray[frameNum] = true;
 

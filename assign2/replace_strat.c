@@ -108,8 +108,8 @@ http://www.informit.com/articles/article.aspx?p=25260&seqNum=7
 BM_PageHandle * lruReplace(BM_BufferPool *const bm){
     BM_PageHandle* ph = bm->mgmtData->poolMem_ptr;
     int PageNumber = lruFindToReplace(bm);
-    if(PageNumber==-1)
-        return ((void *)0);
+    if(PageNumber==NO_PAGE)
+        return NULL;
     ph+=PageNumber;
     return ph;
 }
@@ -150,11 +150,11 @@ void lruFree(BM_BufferPool * bm){
     //free all row arrays
     for(int c = 0; c<bm->numPages;c++){
         free(matrix[c]);
-        matrix[c]=((void*)0);
+        matrix[c]=NULL;
     }
     //free the main pointer
     free(matrix);
-    matrix = ((void *)0);
+    matrix = NULL;
 }
 
 //private function don't need to implement
