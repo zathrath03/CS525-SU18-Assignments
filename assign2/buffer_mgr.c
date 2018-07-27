@@ -280,10 +280,20 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
         return RC_BM_NO_FRAME_AVAIL;
 
     //Arrive here if we have a valid framePtr to a frame
+    frameNum = ((framePtr - bm->mgmtData->poolMem_ptr));
+    if(bm->mgmtData->isDirtyArray[frameNum] == true) {
+        BM_PageHandle *page = (BM_PageHandle*) calloc(1, sizeof(BM_PageHandle));
+        page->pageNum = bm->mgmtData->frameContent[frameNum];
+        page->data = (char*)framePtr;
+        forcePage(bm, page);
+        free(page);
+    }
+
+
     page->pageNum = pageNum;
     page->data = (char*)framePtr;
     //Calculate frameNum from framePtr to increment pool info
-    frameNum = ((framePtr - bm->mgmtData->poolMem_ptr));
+
     bm->mgmtData->fixCountArray[frameNum] = 1;
     bm->mgmtData->frameContent[frameNum] = pageNum;
 
