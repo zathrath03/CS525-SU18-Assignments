@@ -38,6 +38,7 @@ static void testReadPage (void);
 static void testFIFO (void);
 static void testLRU (void);
 static void testClock(void);
+static void testLFU (void);
 
 // main method
 int
@@ -51,6 +52,7 @@ main (void)
   testFIFO();
   testLRU();
   testClock();
+  testLFU();
   return 0;
 }
 
@@ -371,6 +373,84 @@ testClock (void)
   // check number of write IOs
   ASSERT_EQUALS_INT(3, getNumWriteIO(bm), "check number of write I/Os");
   ASSERT_EQUALS_INT(8, getNumReadIO(bm), "check number of read I/Os");
+
+  CHECK(shutdownBufferPool(bm));
+  CHECK(destroyPageFile("testbuffer.bin"));
+
+  free(bm);
+  free(h);
+  TEST_DONE();
+}
+
+// test the LFU page replacement strategy
+void
+testLFU (void)
+{
+  // expected results
+  const char *poolContents[] = {
+    // read first five pages and directly unpin them
+    "[0 0],[-1 0],[-1 0],[-1 0],[-1 0]" ,
+    "[0 0],[1 0],[-1 0],[-1 0],[-1 0]",
+    "[0 0],[1 0],[2 0],[-1 0],[-1 0]",
+    "[0 0],[1 0],[2 0],[3 0],[-1 0]",
+    "[0 0],[1 0],[2 0],[3 0],[4 0]",
+    // use some of the page to create a fixed LFU order without changing pool content
+    "[0 0],[1 0],[2 0],[3 0],[4 0]",
+    "[0 0],[1 0],[2 0],[3 0],[4 0]",
+    "[0 0],[1 0],[2 0],[3 0],[4 0]",
+    "[0 0],[1 0],[2 0],[3 0],[4 0]",
+    "[0 0],[1 0],[2 0],[3 0],[4 0]",
+    // check that pages get evicted in LFU order
+    "[0 0],[1 0],[2 0],[5 0],[4 0]",
+    "[0 0],[1 0],[2 0],[5 0],[6 0]",
+    "[7 0],[1 0],[2 0],[5 0],[6 0]",
+    "[7 0],[1 0],[8 0],[5 0],[6 0]",
+    "[7 0],[9 0],[8 0],[5 0],[6 0]"
+  };
+  const int orderRequests[] = {3,4,0,2,1};
+  const int numLFUOrderChange = 5;
+
+  int i;
+  int snapshot = 0;
+  BM_BufferPool *bm = MAKE_POOL();
+  BM_PageHandle *h = MAKE_PAGE_HANDLE();
+  testName = "Testing LFU page replacement";
+
+  CHECK(createPageFile("testbuffer.bin"));
+  createDummyPages(bm, 100);
+  CHECK(initBufferPool(bm, "testbuffer.bin", 5, RS_LFU, NULL));
+
+  // reading first five pages linearly with direct unpin and no modifications
+  for(i = 0; i < 5; i++)
+  {
+      pinPage(bm, h, i);
+      unpinPage(bm, h);
+      ASSERT_EQUALS_POOL(poolContents[snapshot], bm, "check pool content reading in pages");
+      snapshot++;
+  }
+
+  // read pages to change LFU order
+  for(i = 0; i < numLFUOrderChange; i++)
+  {
+      pinPage(bm, h, orderRequests[i]);
+      unpinPage(bm, h);
+      ASSERT_EQUALS_POOL(poolContents[snapshot], bm, "check pool content using pages");
+      snapshot++;
+  }
+
+  // replace pages and check that it happens in LFU order
+  for(i = 0; i < 5; i++)
+  {
+
+      pinPage(bm, h, 5 + i);
+      unpinPage(bm, h);
+      ASSERT_EQUALS_POOL(poolContents[snapshot], bm, "check pool content using pages");
+      snapshot++;
+  }
+
+  // check number of write IOs
+  ASSERT_EQUALS_INT(0, getNumWriteIO(bm), "check number of write I/Os");
+  ASSERT_EQUALS_INT(10, getNumReadIO(bm), "check number of read I/Os");
 
   CHECK(shutdownBufferPool(bm));
   CHECK(destroyPageFile("testbuffer.bin"));
