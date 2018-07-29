@@ -127,11 +127,12 @@ BM_Frame * lruReplace(BM_BufferPool *const bm){
     int PageNumber = lruFindToReplace(bm);
     if(PageNumber==NO_PAGE)
         return NULL;
-    return frame + PageNumber;
+    frame+=PageNumber;
+    return frame;
 }
 
 void lruInit(BM_BufferPool * bm){
-    int **matrix = (int**) calloc(bm->numPages,(sizeof(int *)));
+    int **matrix = (int**) calloc(bm->numPages,sizeof(int *));
     if(!matrix)
     {
         printError(RC_BM_MEMORY_ALOC_FAIL);
@@ -173,9 +174,19 @@ void lruFree(BM_BufferPool * bm){
     matrix = NULL;
 }
 
+//debug function
+void printtMatrix(int**matrix, int dim){
+    for(int i = 0;i<dim;i++){
+        printf("\n");
+        for(int j=0; j<dim;j++){
+            printf("%d\t",matrix[i][j]);
+        }
+    }
+}
 //private function don't need to implement
 static int lruFindToReplace(BM_BufferPool *const bm){
     int **matrix = (int **) bm->mgmtData->rplcStratStruct;
+   // printtMatrix(matrix, bm->numPages);
     int minIndex = -1;
     int minVal = -1;
     for(int i=0;i<bm->numPages;i++)
@@ -193,7 +204,7 @@ static int lruFindToReplace(BM_BufferPool *const bm){
                break;
             }
         }
-        if((rowMin<minVal || minVal ==-1))
+        if((rowMin>minVal || minVal ==-1))
         {
             minVal = rowMin;
             minIndex = i;

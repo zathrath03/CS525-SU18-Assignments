@@ -80,7 +80,7 @@ createDummyPages(BM_BufferPool *bm, int num)
   int i;
   BM_PageHandle *h = MAKE_PAGE_HANDLE();
 
-  CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
+  CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_LRU, NULL));
 
   for (i = 0; i < num; i++)
     {
@@ -102,7 +102,7 @@ checkDummyPages(BM_BufferPool *bm, int num)
   BM_PageHandle *h = MAKE_PAGE_HANDLE();
   char *expected = malloc(sizeof(char) * 512);
 
-  CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
+  CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_LRU, NULL));
 
   for (i = 0; i < num; i++)
     {
