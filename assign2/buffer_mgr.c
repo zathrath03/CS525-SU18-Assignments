@@ -15,6 +15,7 @@ static BM_Frame * findEmptyFrame(BM_BufferPool *bm);
 
 //Prototypes helper functions
 static int findFrameNumber(BM_BufferPool * bm, PageNumber pageNumber);
+static void pinRplcStrat(BM_BufferPool* bm, int frameNum);
 /*********************************************************************
 *
 *             BUFFER MANAGER INTERFACE POOL HANDLING
@@ -269,26 +270,42 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
         //Initialize the BM_PageHandle data
         page->pageNum = pageNum;
         page->data = (char*)(bm->mgmtData->poolMem_ptr + frameNum);
+        pinRplcStrat(bm, frameNum);
         return RC_OK;
     }
 
     //Arrive here if the page was not already pinned in a frame
     //Find a frame to put the page in
+
     BM_Frame *framePtr = findEmptyFrame(bm);
     //if framePtr is NULL, there are no frames available
     if(!framePtr)
         return RC_BM_NO_FRAME_AVAIL;
 
     //Arrive here if we have a valid framePtr to a frame
+    //But we need to forcePage to disk first IF DIRTY
     frameNum = ((framePtr - bm->mgmtData->poolMem_ptr));
     if(bm->mgmtData->isDirtyArray[frameNum] == true) {
-        BM_PageHandle *page = (BM_PageHandle*) calloc(1, sizeof(BM_PageHandle));
-        page->pageNum = bm->mgmtData->frameContent[frameNum];
-        page->data = (char*)framePtr;
-        forcePage(bm, page);
-        free(page);
+        BM_PageHandle *ph = (BM_PageHandle*) calloc(1, sizeof(BM_PageHandle));
+        ph->pageNum = bm->mgmtData->frameContent[frameNum];
+        ph->data = (char*)framePtr;
+        forcePage(bm, ph);
+        free(ph);
     }
 
+    //Maybe try to read from disk
+    struct SM_FileHandle fHandle;
+    RC returnCode;
+    if((returnCode = openPageFile(bm->pageFile,&fHandle))!=RC_OK){
+        return returnCode;
+    }
+    if(fHandle.totalNumPages>pageNum){
+        if((returnCode = readBlock(pageNum,&fHandle,((SM_PageHandle)framePtr)))!=RC_OK)
+           return returnCode;
+        bm->mgmtData->numReadIO++;
+    }
+    if((returnCode=closePageFile(&fHandle))!=RC_OK)
+       return returnCode;
 
     page->pageNum = pageNum;
     page->data = (char*)framePtr;
@@ -297,6 +314,12 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     bm->mgmtData->fixCountArray[frameNum] = 1;
     bm->mgmtData->frameContent[frameNum] = pageNum;
 
+    pinRplcStrat(bm, frameNum);
+
+    return RC_OK;
+}
+
+static void pinRplcStrat(BM_BufferPool* bm, int frameNum){
     switch(bm->strategy) {
     case RS_FIFO:
         fifoPin(bm, frameNum);
@@ -313,8 +336,6 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     case RS_LRU_K:
         break;
     }
-
-    return RC_OK;
 }
 
 static BM_Frame * findEmptyFrame(BM_BufferPool *bm) {
@@ -426,7 +447,7 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
         fHandle = NULL;
         return returnCode;
     }
-
+    bm->mgmtData->numWriteIO++;
     //search through the pages stored in the buffer pool for the page of interest
     int frameNum = -1;
     if((frameNum = findFrameNumber(bm, page->pageNum)) == -1)
