@@ -15,6 +15,7 @@ static BM_Frame * findEmptyFrame(BM_BufferPool *bm);
 
 //Prototypes helper functions
 static int findFrameNumber(BM_BufferPool * bm, PageNumber pageNumber);
+static void pinRplcStrat(BM_BufferPool* bm, int frameNum);
 /*********************************************************************
 *
 *             BUFFER MANAGER INTERFACE POOL HANDLING
@@ -269,6 +270,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
         //Initialize the BM_PageHandle data
         page->pageNum = pageNum;
         page->data = (char*)(bm->mgmtData->poolMem_ptr + frameNum);
+        pinRplcStrat(bm, frameNum);
         return RC_OK;
     }
 
@@ -312,6 +314,12 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     bm->mgmtData->fixCountArray[frameNum] = 1;
     bm->mgmtData->frameContent[frameNum] = pageNum;
 
+    pinRplcStrat(bm, frameNum);
+
+    return RC_OK;
+}
+
+static void pinRplcStrat(BM_BufferPool* bm, int frameNum){
     switch(bm->strategy) {
     case RS_FIFO:
         fifoPin(bm, frameNum);
@@ -328,8 +336,6 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
     case RS_LRU_K:
         break;
     }
-
-    return RC_OK;
 }
 
 static BM_Frame * findEmptyFrame(BM_BufferPool *bm) {
@@ -441,7 +447,7 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
         fHandle = NULL;
         return returnCode;
     }
-
+    bm->mgmtData->numWriteIO++;
     //search through the pages stored in the buffer pool for the page of interest
     int frameNum = -1;
     if((frameNum = findFrameNumber(bm, page->pageNum)) == -1)
