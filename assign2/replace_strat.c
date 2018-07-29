@@ -307,18 +307,6 @@ void lfuFree(BM_BufferPool *const bm){
 void lfuPin(BM_BufferPool *const bm, int frameNum){
     BM_PoolInfo *poolInfo = bm->mgmtData;
     RS_LFUInfo *lfuInfo = poolInfo->rplcStratStruct;
-    //Check if the page already exists to be safe
-    LFUnode *node = lfuInfo->head;
-    do{
-      if (node->frameNumber == frameNum){
-        //Increment that node's frequency
-        node->frequency++;
-        return;
-      }
-      else
-        node = node->nextNode;
-    }while(node->nextNode != NULL); //could also use while node != tail
-
   	//Only arrives here if the page isn't already in the list
     //If new node is entered then do the following
     LFUnode *newNode = (LFUnode*)calloc(1, sizeof(LFUnode));
@@ -338,6 +326,19 @@ void lfuPin(BM_BufferPool *const bm, int frameNum){
       (lfuInfo->tail)->nextNode = newNode;
       lfuInfo->tail = newNode;
     }
+
+    //Check if the page already exists to be safe
+    LFUnode *node = lfuInfo->head;
+    do{
+      if (node->frameNumber == frameNum){
+        //Increment that node's frequency
+        node->frequency++;
+        return;
+      }
+      else
+        node = node->nextNode;
+    }while(node->nextNode != NULL); //could also use while node != tail
+
 }
 
 BM_Frame * lfuReplace(BM_BufferPool *const bm){
