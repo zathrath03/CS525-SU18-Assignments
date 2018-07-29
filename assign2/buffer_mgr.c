@@ -274,21 +274,36 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, const
 
     //Arrive here if the page was not already pinned in a frame
     //Find a frame to put the page in
+
     BM_Frame *framePtr = findEmptyFrame(bm);
     //if framePtr is NULL, there are no frames available
     if(!framePtr)
         return RC_BM_NO_FRAME_AVAIL;
 
     //Arrive here if we have a valid framePtr to a frame
+    //But we need to forcePage to disk first IF DIRTY
     frameNum = ((framePtr - bm->mgmtData->poolMem_ptr));
     if(bm->mgmtData->isDirtyArray[frameNum] == true) {
-        BM_PageHandle *page = (BM_PageHandle*) calloc(1, sizeof(BM_PageHandle));
-        page->pageNum = bm->mgmtData->frameContent[frameNum];
-        page->data = (char*)framePtr;
-        forcePage(bm, page);
-        free(page);
+        BM_PageHandle *ph = (BM_PageHandle*) calloc(1, sizeof(BM_PageHandle));
+        ph->pageNum = bm->mgmtData->frameContent[frameNum];
+        ph->data = (char*)framePtr;
+        forcePage(bm, ph);
+        free(ph);
     }
 
+    //Maybe try to read from disk
+    struct SM_FileHandle fHandle;
+    RC returnCode;
+    if((returnCode = openPageFile(bm->pageFile,&fHandle))!=RC_OK){
+        return returnCode;
+    }
+    if(fHandle.totalNumPages>pageNum){
+        if((returnCode = readBlock(pageNum,&fHandle,((SM_PageHandle)framePtr)))!=RC_OK)
+           return returnCode;
+        bm->mgmtData->numReadIO++;
+    }
+    if((returnCode=closePageFile(&fHandle))!=RC_OK)
+       return returnCode;
 
     page->pageNum = pageNum;
     page->data = (char*)framePtr;
