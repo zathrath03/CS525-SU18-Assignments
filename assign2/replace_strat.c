@@ -251,11 +251,13 @@ BM_Frame * clockReplace(BM_BufferPool *const bm){
     //search through the poolInfo arrays to find a page with fixCount=0 and ref=false
     while(true){
         //returns a pointer to the first frame that has fixCount=0 and ref=false
-        if (bm->mgmtData->fixCountArray[clockInfo->curFrame] == 0 && clockInfo->wasReferencedArray == false){
+        if (bm->mgmtData->fixCountArray[clockInfo->curFrame] == 0 && clockInfo->wasReferencedArray[clockInfo->curFrame] == false){
+
+            BM_Frame *pframe = bm->mgmtData->poolMem_ptr + clockInfo->curFrame;
             //increment curFrame to prevent always replacing the same page
             clockInfo->curFrame = (clockInfo->curFrame + 1) % bm->numPages;
             //return the frame pointer
-            return (bm->mgmtData->poolMem_ptr + clockInfo->curFrame);
+            return pframe;
         }
 
         //reset the ref to false

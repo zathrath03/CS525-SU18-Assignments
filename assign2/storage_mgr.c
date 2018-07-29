@@ -65,9 +65,6 @@ RC closePageFile(SM_FileHandle* fHandle){
     if(fclose(fp)<0){
         return RC_FILE_NOT_CLOSED;
     }
-    //just for safety
-    free(fHandle);
-    fHandle = ((void*)0); //NULL
     return RC_OK;
 }
 
