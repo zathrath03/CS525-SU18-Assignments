@@ -55,13 +55,15 @@ RC forceFlushPool(BM_BufferPool *const bm);
 *causes all dirty pages (with fix count 0) from the buffer pool to be written to disk.*
 
 * Initializes a SM_FileHandle in which to store the file data from the storage manager
+* Check to see if the memory was correctly allocated, if not then print error code and exit
+* Locate a page whose fixCount is 0 and dirtyBit is True.
+* Set the address of the beginning of memory page to variable mempage which is of type SM_PageHandle
 * Opens the page file specified by bm->pageFile and stores its data in fHandle
 * Returns an error return code if openPageFile() does not return RC_OK
-* Locate a page whose fixCount is 0 and dirtyBit is True.
 * Write the data from that page to the appropriate block on disk using writeBlock()
 * Returns an error return code if writeBlock() does not return RC_OK
-* After data is written from the page to the appropriate block, set the page's dirtyBit to False and increment numWriteIO 
-* Finally, close the page file and return the error return code if closePageFile() does not return RC_OK 
+* Close the page file and return the error return code if closePageFile() does not return RC_OK
+* Set the page's dirtyBit to False and increment numWriteIO
 
 ### Buffer Manager Interface Access Pages
 
@@ -241,7 +243,7 @@ typedef struct LFUnode {
 ```c
 void lfuInit(BM_BufferPool *bm);
 ```
-* Allocates memory for the lfuInfo struct 
+* Allocates memory for the lfuInfo struct
 * Sets the head of lfuInfo to point to NULL
 * Sets the tail of lfuInfo to point to NULL
 
@@ -251,7 +253,7 @@ void lfuFree(BM_BufferPool *const bm);
 ```
 * Loop through every node in the linked list and free the memory allocated for each node
 * Free the structure pointers (head and tail)
-* Finally, free the struct itself 
+* Finally, free the struct itself
 
 ##### lfuPin
 ```c
@@ -278,7 +280,7 @@ Implements the replacement strategy. Does not perform input validation.
 	* If the head node was not the correct frame, we will iterate through linkedlist to find the correct node, using a while loop
 		* Once that correct node is found, then replace that node and re-adjust the pointers. Then return the pageHandle + frameNum.
 	* If the node we want to remove is in the tail, then remove the node pointed by tail, and re-adjust the pointers. Then return the pageHandle + frameNum.
-	* If the frame is not found in the linkedlist, then return an error saying that the frame was not found and return the pageHandle + frameNum. 
+	* If the frame is not found in the linkedlist, then return an error saying that the frame was not found and return the pageHandle + frameNum.
 
 
 ## Testing
