@@ -39,13 +39,17 @@ typedef struct BM_PageHandle {
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, const int numPages, ReplacementStrategy strategy, void *stratData);
 ```
 *creates a new buffer pool with* numPages *page frames using the page replacement strategy* strategy*. The pool is used to cache pages from the page file with name pageFileName. Initially, all page frames should be empty. The page file should already exist, i.e., this method should not generate a new page file. stratData can be used to pass parameters for the page replacement strategy. For example, for LRU-k this could be the parameter k.*
-
+it also initializes the structure for the underlying replacement stragtegy.
 #### shutdownBufferPool
 
 ```c
 RC shutdownBufferPool(BM_BufferPool *const bm);
 ```
 *destroys a buffer pool. This method should free up all resources associated with buffer pool. For example, it should free the memory allocated for page frames. If the buffer pool contains any dirty pages, then these pages should be written back to disk before destroying the pool. It is an error to shutdown a buffer pool that has pinned pages.*
+Resources such as:
+- pagesFrame ptrs
+- struct for poolInfo
+- struct for BufferManager
 
 #### forceFlushPool
 
