@@ -1,7 +1,11 @@
 # Assignment 3 - Record Manager
 
-## tables
-
-You probably will have to reserve one or more pages of a page file to store table information pages, e.g. the schema of the table.
-
-This header defines basic data structures for schemas, tables, records, record ids (RIDs), and values. Furthermore, this header defines functions for serializing these data structures as strings. The serialization functions are provided (rm_serializer.c)
+## Definitions
+### Page - A PAGE_SIZE chunk of data, regardless of where it is stored
+### Block - A storage location for a page on disk
+### Frame - A storage location for a page in memory
+### PageFile - A file on disk that contains one or more blocks
+### PageFile Header - The portion of a PageFile that contains metadata for the PageFile
+### Page Header - The portion of a page that contains metadata for the page
+### Slot - A storage location for a record in a page
+### Record - The concatenation of the binary representation of its attributes according to the schema. Not to be confused with the Record struct which also includes the record id.

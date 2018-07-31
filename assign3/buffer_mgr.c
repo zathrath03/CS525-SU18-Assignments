@@ -41,7 +41,7 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
         return RC_NO_FILENAME;
     bm->pageFile = (char *)pageFileName;
     //check if the pageFile is a valid one
-    if(access(pageFileName, 0) == -1)
+    if(access(pageFileName, R_OK|W_OK) == -1)
         return RC_FILE_NOT_FOUND;
     //check the number of pages
     if(numPages<1)
