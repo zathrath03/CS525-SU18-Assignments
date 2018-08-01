@@ -7,6 +7,19 @@
 
 // Prototypes for helper functions
 
+// Macros
+#define VALID_CALLOC(type, varName, number, size)   \
+    type *varName = (type *) calloc(number, size);  \
+    if(!varName){                                   \
+        printError(RC_BM_MEMORY_ALOC_FAIL);         \
+        exit(-1);                                   \
+    }
+
+#define ASSERT_RC_OK(functionCall)          \
+    RC returnCode = RC_INIT;                \
+    if((returnCode = functionCall) != RC_OK \
+       return returnCode;
+
 /*********************************************************************
 *
 *                TABLE AND RECORD MANAGER FUNCTIONS
@@ -61,9 +74,10 @@ RC openTable (RM_TableData *rel, char *name){
     // initialize a buffer pool
         // ?? How many pages should we use?
     // pin page with pageFile header
+    // create a pointer and allocate memory for a schema struct
     // **populate the schema struct with the schema from disk**
     // initialize rel->schema
-    // initialize rel->name
+    // initialize rel->name = name;
     // initialize rel->mgmtData
 
     return RC_OK;
@@ -80,9 +94,8 @@ RC closeTable (RM_TableData *rel){
     // close the page file
     // free BM_BufferPool pointer
         //should we add this back to shutdownBufferPool()?
-    // free rel->mgmtData pointer
-        //don't free rel->name or rel->schema since they're allocated
-        //by the calling program
+    // free rel->mgmtData and rel->schema pointers
+        //don't free rel->name since it's allocated by the caller
     return RC_OK;
 }
 
@@ -129,7 +142,7 @@ RC insertRecord (RM_TableData *rel, Record *record){
     //read location of next free slot from current slot
         //if there isn't another free slot in this page, we need to
         //find the next page that has a free slot and update the
-        //pageFile header
+        //pageFile header. A free slot must not protrude past the end of the page
     //write location of next free slot to page header
     //write record->data to current slot
     //increment numTuples in the pageFile header

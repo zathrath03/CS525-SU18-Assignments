@@ -11,14 +11,6 @@ typedef struct RM_ScanHandle {
     void *mgmtData;
 } RM_ScanHandle;
 
-// Macro for validating memory allocation
-#define VALID_CALLOC(type, varName, number, size)   \
-    type *varName = (type *) calloc(number, size);        \
-    if(!varName){                                   \
-        printError(RC_BM_MEMORY_ALOC_FAIL);         \
-        exit(-1);                                   \
-    }
-
 // table and manager
 extern RC initRecordManager (void *mgmtData);
 extern RC shutdownRecordManager ();
