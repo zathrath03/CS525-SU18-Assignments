@@ -359,12 +359,29 @@ RC getRecord (RM_TableData *rel, RID id, Record *record){
 *                        SCAN FUNCTIONS
 *
 *********************************************************************/
+//initializes the RM_ScanHandle data structure passed as an argument to startScan.
 RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond){
+    //Validation of inputs
+    if(!rel || !scan || !cond)  //If input is invalid then return error code
+        return RC_RM_INIT_ERROR;
+
+    scan->mgmtData = cond;  //Store the condition into the mgmtData field
+    scan->rel = rel;        //Store the relation into the rel field
     return RC_OK;
 }
+//next method should return the next tuple that fulfills the scan condition
+//If NULL is passed as a scan condition, then all tuples of the table should be returned
 RC next (RM_ScanHandle *scan, Record *record){
+    //Validation of inputs
+    if(!scan || !record)    //If input is invalid then return error code
+      return RC_RM_INIT_ERROR;
+
+//    if()
+
     return RC_OK;
+    //next should return RC_RM_NO_MORE_TUPLES once the scan is completed and RC_OK otherwise
 }
+//Return RC_OK
 RC closeScan (RM_ScanHandle *scan){
     return RC_OK;
 }
@@ -389,8 +406,27 @@ RC freeSchema (Schema *schema){
 *
 *                        ATTRIBUTE FUNCTIONS
 *
+#define VALID_CALLOC(type, varName, number, size)   \
+    type *varName = (type *) calloc(number, size);  \
+    if(!varName){                                   \
+        printError(RC_BM_MEMORY_ALOC_FAIL);         \
+        exit(-1);                                   \
+    }
+
 *********************************************************************/
+//Create a record for the schema passed in
 RC createRecord (Record **record, Schema *schema){
+    //Validate passed input
+    if(!record || !schema)
+      return RC_RM_INIT_ERROR;
+    //Allocate memory for the new record and its data
+    //And initialize to all 0's
+    VALID_CALLOC(Record, *rec, 0, sizeof(Record));
+    VALID_CALLOC(char, *info, 0, (sizeof(char) * getRecordSize(schema)));
+    //store the
+    rec->data= info;
+
+
     return RC_OK;
 }
 RC freeRecord (Record *record){
