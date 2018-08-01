@@ -44,19 +44,30 @@ Offset Macros for retrieving data from the PageFile header
 /**firstNameOffset requires defining keySize**/
 #define firstNameOffset keySizeOffset + keySize*sizeof(unsigned short)
 
+/*********************************************************************
+*
+*                       FUNCTION PROTOTYPES
+*
+*********************************************************************/
 // Prototypes for helper functions
 int static findFreeSlot(bitmap * bitMap);
 static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
 static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
 
-/*********************************************************************
-* Notes:
-* This implementation of the bitMap and double linked list
-* isn't circular.
-* - The next of the tail points to NO_PAGE.
-* - The previous of the head points to N0_PAGE as well
-* appending is to the head, deleting could be anywhere
-*********************************************************************/
+// Prototypes for getters and setters for pagefile header data
+static unsigned short getRecordSizePF(BM_Frame *pframe);
+static void setRecordSizePF(BM_Frame *pframe, unsigned short recordSize);
+static unsigned int getNumTuplesPF(BM_Frame *pframe);
+static void setNumTuplesPF(BM_Frame *pframe, unsigned int numTuples);
+static unsigned int getNextFreePage(BM_Frame *pframe);
+static void setNextFreePage(BM_Frame *pframe, unsigned int nextFreePage);
+static unsigned short getNumSlotsPerPage(BM_Frame *pframe);
+static unsigned short getSchemaSize(BM_Frame *pframe);
+static unsigned short getSchema(BM_Frame *pframe, Schema *schema);
+static DataType getIthDataType(BM_Frame *pframe, int ithSlot);
+static unsigned short getIthTypeLength(BM_Frame *pframe, int ithSlot);
+static unsigned short getKeySize(BM_Frame *pframe);
+static char* getIthAttrName(BM_Frame *pframe, int ithSlot, char* attrName);
 
 /*********************************************************************
 * Notes:
@@ -569,4 +580,57 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     phr->nextFreePage = NO_PAGE;
     phr->prevFreePage = NO_PAGE;
     return RC_OK;
+}
+
+/*********************************************************************
+*
+*               PAGEFILE HEADER GETTERS AND SETTERS
+*
+*********************************************************************/
+static unsigned short getRecordSizePF(BM_Frame *pframe){
+    unsigned short recordSize = *(unsigned short*) (pframe + recordSizeOffset);
+    return recordSize;
+}
+static void setRecordSizePF(BM_Frame *pframe, unsigned short recordSize){
+    unsigned short *recordSizePtr = (unsigned short*) (pframe + recordSizeOffset);
+    *recordSizePtr = recordSize;
+}
+static unsigned int getNumTuplesPF(BM_Frame *pframe){
+    unsigned int numTuples = *(unsigned int*) (pframe + numTuplesOffset);
+    return numTuples;
+}
+static void setNumTuplesPF(BM_Frame *pframe, unsigned int numTuples){
+    unsigned int *numTuplesPtr = (unsigned int*) (pframe + numTuplesOffset);
+    *numTuplesPtr = numTuples;
+}
+static unsigned int getNextFreePage(BM_Frame *pframe){
+    unsigned int nextFreePage = *(unsigned int*) (pframe + nextFreePageOffset);
+    return nextFreePage;
+}
+static void setNextFreePage(BM_Frame *pframe, unsigned int nextFreePage){
+    unsigned int *nextFreePagePtr = (unsigned int*) (pframe + numTuplesOffset);
+    *nextFreePagePtr = nextFreePage;
+}
+static unsigned short getNumSlotsPerPage(BM_Frame *pframe){
+    unsigned short numSlotsPerPage = *(unsigned short*) (pframe + numSlotsPerPageOffset);
+    return numSlotsPerPage;
+}
+static unsigned short getSchemaSize(BM_Frame *pframe){
+    unsigned short schemaSize = *(unsigned short*) (pframe + schemaSizeOffset);
+    return schemaSize;
+}
+static unsigned short getSchema(BM_Frame *pframe, Schema *schema){
+    return 0;
+}
+static DataType getIthDataType(BM_Frame *pframe, int ithSlot){
+    return DT_INT;
+}
+static unsigned short getIthTypeLength(BM_Frame *pframe, int ithSlot){
+    return 0;
+}
+static unsigned short getKeySize(BM_Frame *pframe){
+    return 0;
+}
+static char* getIthAttrName(BM_Frame *pframe, int ithSlot, char* attrName){
+    return attrName;
 }
