@@ -47,7 +47,7 @@ Offset Macros for retrieving data from the PageFile header
 // Prototypes for helper functions
 int static findFreeSlot(bitmap * bitMap);
 static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
-void static deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
+static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
 
 /*********************************************************************
 * Notes:
@@ -254,6 +254,7 @@ INPUT:
     id: initialized with the page and slot of the record of interest
 *********************************************************************/
 RC deleteRecord (RM_TableData *rel, RID id){
+    RC returnCode = RC_INIT;
     //get location
     int pageNum = id.page;
     short slotNum = id.slot;
@@ -532,8 +533,10 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
     return RC_OK;
 }
 
-void static deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
+static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
                                      RM_PageHeader *phr, BM_BufferPool*bm){
+    RC returnCode = RC_INIT;
+
     //update nextPage, prevPage
     BM_PageHandle nextPageHandle;
     BM_PageHandle prevPageHandle;
@@ -565,4 +568,5 @@ void static deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     //update the current page next and prev
     phr->nextFreePage = NO_PAGE;
     phr->prevFreePage = NO_PAGE;
+    return RC_OK;
 }
