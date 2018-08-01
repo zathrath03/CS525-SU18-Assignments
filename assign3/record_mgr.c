@@ -59,6 +59,14 @@ void static deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr,
 *********************************************************************/
 
 /*********************************************************************
+* Notes:
+* This implementation of the bitMap and double linked list
+* isn't circular.
+* - The next of the tail points to NO_PAGE.
+* - The previous of the head points to N0_PAGE as well
+* appending is to the head, deleting could be anywhere
+*********************************************************************/
+/*********************************************************************
 *
 *                TABLE AND RECORD MANAGER FUNCTIONS
 *
