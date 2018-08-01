@@ -1,9 +1,29 @@
 #ifndef RECORD_MGR_H
 #define RECORD_MGR_H
 
+#include <stdint.h>
 #include "dberror.h"
 #include "expr.h"
 #include "tables.h"
+#include "bitmap.h"
+
+// Data structures
+//headers
+typedef struct RM_PageFileHeader {
+    short recordSize;
+    int numTuples;
+    int nextFreePage;
+    short numSlotsPerPage;
+    short schemaSize;
+    char* schema;
+} RM_PageFileHeader;
+
+typedef struct RM_PageHeader {
+    int prevFreePage;
+    int nextFreePage;
+    bitmap* freeBitMap;
+} RM_PageHeader;
+
 
 // Bookkeeping for scans
 typedef struct RM_ScanHandle {

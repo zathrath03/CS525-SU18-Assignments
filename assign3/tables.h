@@ -2,6 +2,9 @@
 #define TABLES_H
 
 #include <stdbool.h>
+#include "buffer_mgr.h"
+
+
 
 // Data Types, Records, and Schemas
 typedef enum DataType {
@@ -45,7 +48,7 @@ typedef struct Schema {
 typedef struct RM_TableData {
     char *name;
     Schema *schema;
-    void *mgmtData;
+    BM_BufferPool *bufferPool;
 } RM_TableData;
 
 #define MAKE_STRING_VALUE(result, value)				\

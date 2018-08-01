@@ -1,11 +1,12 @@
 #include <stdlib.h>
+#include <string.h>
 
+#include "bitmap.h"
 #include "record_mgr.h"
 #include "buffer_mgr.h"
 
-// Data structures
 
-// Prototypes for helper functions
+
 
 // Macros
 #define VALID_CALLOC(type, varName, number, size)   \
@@ -16,9 +17,14 @@
     }
 
 #define ASSERT_RC_OK(functionCall)          \
-    RC returnCode = RC_INIT;                \
-    if((returnCode = functionCall) != RC_OK \
+    RC returnCode = functionCall;                 \
+    if(returnCode != RC_OK )\
        return returnCode;
+
+
+// Prototypes for helper functions
+int static findFreeSlot(bitmap * bitMap);
+
 
 /*********************************************************************
 *
@@ -134,25 +140,70 @@ INPUT:
 *********************************************************************/
 RC insertRecord (RM_TableData *rel, Record *record){
     //validate input
+    if(!rel)
+        return RC_RM_INIT_ERROR;
+    if(!record)
+        return RC_RM_INIT_ERROR;
     //create two local BM_PageHandles
+    BM_PageHandle pageFileHeader;
+    BM_PageHandle pageToInsert;
+    BM_BufferPool* bm = rel->bufferPool;
     //pin the page with the pageFile header
+    ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
+    RM_PageFileHeader* pfhr = (RM_PageFileHeader *) &pageFileHeader;
     //find the first page with free slot from pageFile header
+    int freePageNum = pfhr->nextFreePage;
+    if(freePageNum==NO_PAGE)
+        return RC_RM_NO_FREE_PAGES;
+    //update record->id.page
+    record->id.page = freePageNum;
     //pin the first page with a free slot
-    //find free slot using free space offset in page header
+    ASSERT_RC_OK(pinPage(bm,&pageToInsert,freePageNum));
+    //find free slot using pageHeader bitMap
+    RM_PageHeader * phr = (RM_PageHeader *) &pageToInsert;
+    bitmap * bitMap = phr->freeBitMap;
+    int nextFreeSlot = findFreeSlot(bitMap);
+    if(nextFreeSlot==bitMap->bits)
+        return RC_RM_NO_FREE_PAGES;
+    //update record->id.slot
+    record->id.slot = nextFreeSlot;
     //read location of next free slot from current slot
-        //if there isn't another free slot in this page, we need to
-        //find the next page that has a free slot and update the
-        //pageFile header. A free slot must not protrude past the end of the page
-    //write location of next free slot to page header
+    int recordSize = getRecordSize(rel->schema);
+    char * slotPtr = (char*) &pageToInsert+sizeof(RM_PageHeader) + (nextFreeSlot * recordSize );
     //write record->data to current slot
+    //maybe we don't need to do recordSize +1 because we don't want the null char
+    //at the end of the record data array
+    memcpy(slotPtr, record->data,recordSize);
+    //update the bitMap
+    bitmap_set(bitMap, nextFreeSlot);
+    //check if the page IS FULL
+    if(findFreeSlot(bitMap)==bitMap->bits)
+    {
+        //update pageFileHeader
+        pfhr->nextFreePage = phr->nextFreePage;
+        //update nextPage prev
+        BM_PageHandle nextPageHandle;
+        ASSERT_RC_OK(pinPage(bm, &nextPageHandle, phr->nextFreePage));
+        RM_PageHeader * nphr = (RM_PageHeader *) &nextPageHandle;
+        nphr->prevFreePage = phr->nextFreePage;
+        ASSERT_RC_OK(markDirty(bm,&nextPageHandle));
+        ASSERT_RC_OK(unpinPage(bm,&nextPageHandle));
+        //update page header
+        phr->prevFreePage = NO_PAGE;
+        phr->nextFreePage = NO_PAGE;
+    }
     //increment numTuples in the pageFile header
+    pfhr->numTuples++;
+    //mark pages as dirty
+    ASSERT_RC_OK(markDirty(bm, &pageFileHeader));
+    ASSERT_RC_OK(markDirty(bm, &pageToInsert));
     //unpin the pageFile header and the page we inserted the record into
-    //update record->id.page and record->id.slot
+    ASSERT_RC_OK(unpinPage(bm,&pageFileHeader));
+    ASSERT_RC_OK(unpinPage(bm,&pageToInsert));
     //we shouldn't need to worry about writing it back to disk
         //that will be handled by page replacement
     return RC_OK;
 }
-
 /*********************************************************************
 deleteRecord deletes the record identified by id from *rel
 INPUT:
@@ -268,3 +319,21 @@ RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
 *                        HELPER FUNCTIONS
 *
 *********************************************************************/
+
+
+/*****************************************
+checks if the bitMap has a freeslot
+if not it return bitMap size as the next
+free slot index
+*****************************************/
+int static findFreeSlot(bitmap * bitMap){
+    int mapSize = bitMap->bits;
+    for(int i=0; i<mapSize;i++)
+    {
+        if(bitmap_read(bitMap,i)==0)
+        {
+            return i;
+        }
+    }
+    return mapSize;
+}
