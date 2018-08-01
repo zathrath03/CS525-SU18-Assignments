@@ -47,6 +47,16 @@ Offset Macros for retrieving data from the PageFile header
 // Prototypes for helper functions
 int static findFreeSlot(bitmap * bitMap);
 static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
+void static deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
+
+/*********************************************************************
+* Notes:
+* This implementation of the bitMap and double linked list
+* isn't circular.
+* - The next of the tail points to NO_PAGE.
+* - The previous of the head points to N0_PAGE as well
+* appending is to the head, deleting could be anywhere
+*********************************************************************/
 
 /*********************************************************************
 *
@@ -197,9 +207,8 @@ RC insertRecord (RM_TableData *rel, Record *record){
     ASSERT_RC_OK(pinPage(bm,&pageToInsert,freePageNum));
     //find free slot using pageHeader bitMap
     RM_PageHeader * phr = (RM_PageHeader *) &pageToInsert;
-    bitmap * bitMap = phr->freeBitMap;
-    int nextFreeSlot = findFreeSlot(bitMap);
-    if(nextFreeSlot==bitMap->bits)
+    int nextFreeSlot = findFreeSlot(phr->freeBitMap);
+    if(nextFreeSlot==phr->freeBitMap->bits)
         return RC_RM_NO_FREE_PAGES;
     //update record->id.slot
     record->id.slot = nextFreeSlot;
@@ -211,22 +220,12 @@ RC insertRecord (RM_TableData *rel, Record *record){
     //at the end of the record data array
     memcpy(slotPtr, record->data,recordSize);
     //update the bitMap
-    bitmap_set(bitMap, nextFreeSlot);
-    //check if the page IS FULL
-    if(findFreeSlot(bitMap)==bitMap->bits)
+    bitmap_set(phr->freeBitMap, nextFreeSlot);
+    //check if the page doesn't have anymore slots
+    //so the page will be removed from the linked list
+    if(findFreeSlot(phr->freeBitMap)==phr->freeBitMap->bits)
     {
-        //update pageFileHeader
-        pfhr->nextFreePage = phr->nextFreePage;
-        //update nextPage prev
-        BM_PageHandle nextPageHandle;
-        ASSERT_RC_OK(pinPage(bm, &nextPageHandle, phr->nextFreePage));
-        RM_PageHeader * nphr = (RM_PageHeader *) &nextPageHandle;
-        nphr->prevFreePage = phr->nextFreePage;
-        ASSERT_RC_OK(markDirty(bm,&nextPageHandle));
-        ASSERT_RC_OK(unpinPage(bm,&nextPageHandle));
-        //update page header
-        phr->prevFreePage = NO_PAGE;
-        phr->nextFreePage = NO_PAGE;
+        deleteFromFreeLinkedList(pfhr,phr,bm);
     }
     //increment numTuples in the pageFile header
     pfhr->numTuples++;
@@ -247,21 +246,55 @@ INPUT:
     id: initialized with the page and slot of the record of interest
 *********************************************************************/
 RC deleteRecord (RM_TableData *rel, RID id){
+    //get location
+    int pageNum = id.page;
+    short slotNum = id.slot;
     //create two local BM_PageHandle
-    //pin pageFile header
-    //find the size of a record(slot) from pageFile header
-    //pin page given by id.page
+    //create two local BM_PageHandles
+    BM_PageHandle pageFileHeader;
+    BM_PageHandle pageToDelete;
+    BM_BufferPool* bm = rel->bufferPool;
+    //pin the page with the pageFile header
+    ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
+    RM_PageFileHeader* pfhr = (RM_PageFileHeader *) &pageFileHeader;
+    ASSERT_RC_OK(pinPage(bm,&pageToDelete,pageNum));
+    //find free slot using pageHeader bitMap
+    RM_PageHeader * phr = (RM_PageHeader *) &pageToDelete;
+    int recordSize = getRecordSize(rel->schema);
     //delete the record at id.slot
         //(offset by slot*recordSize+sizeof(short))
+    char * slotPtr = (char*) &pageToDelete+sizeof(RM_PageHeader) + (slotNum * recordSize );
+    //update bitMap
+    bitmap_clear(phr->freeBitMap, slotNum);
+    //Not sure if this is truly necessary
+    //if we update the bitMap then we won't read from that slot anymore
+    //this is just for safety and can be taken out
+    char emptyRecord[recordSize] = {NULL};
+    memcpy(slotPtr, emptyRecord, recordSize);
+
+    //check if the page doesn't have anymore slots
+    //so the page will be removed from the linked list
+    if(findFreeSlot(phr->freeBitMap)==phr->freeBitMap->bits)
+    {
+        deleteFromFreeLinkedList(pfhr,phr,bm);
+    }
     //read free space ptr from page's header
     //write free space ptr to newly freed slot
     //update page's free space ptr to point to newly freed slot
         //check if it previously had a free slot for later use
     //decrement numTuples
+    pfhr->numTuples--;
+    //mark pages as dirty
+    ASSERT_RC_OK(markDirty(bm, &pageFileHeader));
+    ASSERT_RC_OK(markDirty(bm, &pageToDelete));
+    //unpin the pageFile header and the page we inserted the record into
+    ASSERT_RC_OK(unpinPage(bm,&pageFileHeader));
+    ASSERT_RC_OK(unpinPage(bm,&pageToDelete));
+    //we shouldn't need to worry about writing it back to disk
+        //that will be handled by page replacement
     //**if the page didn't previously have a free slot, check
         //to see if it is now the first page with a free slot
         //and update pageFile header appropriately
-    //unpin pages
     return RC_OK;
 }
 
@@ -489,4 +522,39 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
     free(keyAttrs);
     free(strLen);
     return RC_OK;
+}
+
+void static deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
+                                     RM_PageHeader *phr, BM_BufferPool*bm){
+    //update nextPage, prevPage
+    BM_PageHandle nextPageHandle;
+    BM_PageHandle prevPageHandle;
+    //this page is the header
+    if(phr->prevFreePage == NO_PAGE){
+        //update pageFileHeader
+        pfhr->nextFreePage = phr->nextFreePage;
+    }
+    else{
+        //update next page Header
+        ASSERT_RC_OK(pinPage(bm, &prevPageHandle, phr->prevFreePage));
+        RM_PageHeader * pphr = (RM_PageHeader *) &prevPageHandle;
+        //update the head
+        pphr->nextFreePage = phr->nextFreePage;
+        ASSERT_RC_OK(markDirty(bm,&prevPageHandle));
+        ASSERT_RC_OK(unpinPage(bm,&prevPageHandle));
+    }
+    //if the page is not the tail
+    if(phr->nextFreePage != NO_PAGE)
+    {
+        //update next page Header
+        ASSERT_RC_OK(pinPage(bm, &nextPageHandle, phr->nextFreePage));
+        RM_PageHeader * nphr = (RM_PageHeader *) &nextPageHandle;
+        //update the head
+        nphr->prevFreePage = phr->prevFreePage;
+        ASSERT_RC_OK(markDirty(bm,&nextPageHandle));
+        ASSERT_RC_OK(unpinPage(bm,&nextPageHandle));
+    }
+    //update the current page next and prev
+    phr->nextFreePage = NO_PAGE;
+    phr->prevFreePage = NO_PAGE;
 }
