@@ -421,10 +421,8 @@ RC createRecord (Record **record, Schema *schema){
       return RC_RM_INIT_ERROR;
     //Allocate memory for the new record and its data
     //And initialize to all 0's
-    VALID_CALLOC(Record, *rec, 0, sizeof(Record));
-    VALID_CALLOC(char, *info, 0, (sizeof(char) * getRecordSize(schema)));
-    //store the
-    rec->data= info;
+    VALID_CALLOC(Record, rec, 0, sizeof(Record));
+    rec->data = (char*) malloc(getRecordSize(schema));
 
 
     return RC_OK;
