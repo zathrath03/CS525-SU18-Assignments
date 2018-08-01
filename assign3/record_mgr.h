@@ -9,12 +9,20 @@
 
 // Data structures
 //headers
+typedef struct RM_Schema {
+    unsigned short numAttr;
+    unsigned short* typeAndLength;
+    unsigned short keySize;
+    unsigned short* keyAttrs;
+    char* namesAndLength;
+} RM_Schema;
+
 typedef struct RM_PageFileHeader {
-    short recordSize;
-    int numTuples;
-    int nextFreePage;
-    short numSlotsPerPage;
-    short schemaSize;
+    unsigned short recordSize;
+    unsigned int numTuples;
+    unsigned int nextFreePage;
+    unsigned short numSlotsPerPage;
+    unsigned short schemaSize;
     char* schema;
 } RM_PageFileHeader;
 
