@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include "buffer_mgr.h"
 
-
-
 // Data Types, Records, and Schemas
 typedef enum DataType {
     DT_INT = 0,
@@ -77,7 +75,6 @@ typedef struct RM_TableData {
 	break;								\
       }									\
   } while(0)
-
 
 // debug and read methods
 extern Value *stringToValue (char *value);

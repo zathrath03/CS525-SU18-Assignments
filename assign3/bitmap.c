@@ -8,7 +8,7 @@
 Source: http://www.cse.psu.edu/~deh25/cmpsc473/assignments/HW1/bitmap.c
 
 ********************************************************/
-#ifdef bitmap_64
+#ifdef bitmap_64 // assumed to be 64 bits
   #define bitmap_type unsigned long long int
   #define bitmap_shift        6
   #define bitmap_mask        63
