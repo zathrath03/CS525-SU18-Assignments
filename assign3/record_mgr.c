@@ -194,9 +194,8 @@ RC closeTable (RM_TableData *rel){
     ASSERT_RC_OK(shutdownBufferPool(rel->bufferPool));
     // free memory allocated for arrays in schema
     ASSERT_RC_OK(freeSchema(rel->schema));
-    // free BM_BufferPool pointer & rel->schema pointer
+    // free BM_BufferPool pointer
     free(rel->bufferPool);
-    free(rel->schema);
     // don't free rel->name since it's allocated by the caller
     return RC_OK;
 }
@@ -483,14 +482,53 @@ RC closeScan (RM_ScanHandle *scan){
 *                        SCHEMA FUNCTIONS
 *
 *********************************************************************/
+/*********************************************************************
+getRecordSize sums the typeLengths of the attributes to determine
+recordSize
+INPUT: initialized Schema
+RETURNS: the size of a single record for the provided schema
+*********************************************************************/
 int getRecordSize (Schema *schema){
-    return 0;
+    int recordSize = 0;
+    for(int i = 0; i < schema->numAttr; i++){
+        recordSize += schema->typeLength[i];
+    }
+    return recordSize;
 }
+/*********************************************************************
+createSchema allocates memory for a Schema struct and points each
+member of the struct to the parameters passed to the function
+INPUT: Initialized values for all members of the Schema struct
+*********************************************************************/
 Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
     VALID_CALLOC(Schema, schema, 1, sizeof(Schema));
+
+    schema->numAttr = numAttr;
+    schema->attrNames = attrNames;
+    schema->dataTypes = dataTypes;
+    schema->typeLength = typeLength;
+    schema->keyAttrs = keys;
+    schema->keySize = keySize;
     return schema;
 }
+/*********************************************************************
+freeSchema frees all memory associated with a Schema struct, including
+the memory for the struct itself
+INPUT: initialized Schema
+*********************************************************************/
 RC freeSchema (Schema *schema){
+    for(int i = 0; i < schema->numAttr; i++){
+        free(schema->attrNames[i]);
+        schema->attrNames[i] = NULL;
+    }
+    free(schema->dataTypes);
+    schema->dataTypes = NULL;
+    free(schema->typeLength);
+    schema->typeLength = NULL;
+    free(schema->keyAttrs);
+    schema->keyAttrs = NULL;
+    free(schema);
+    schema = NULL;
     return RC_OK;
 }
 
@@ -599,12 +637,10 @@ RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
 *
 *********************************************************************/
 
-
-/*****************************************
-checks if the bitMap has a freeslot
-if not it return bitMap size as the next
-free slot index
-*****************************************/
+/*********************************************************************
+checks if the bitMap has a free slot if not it return bitMap size as
+the next free slot index
+*********************************************************************/
 int static findFreeSlot(bitmap * bitMap){
     int mapSize = bitMap->bits;
     for(int i=0; i<mapSize;i++)
@@ -733,6 +769,7 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
     free(strLen);
     return RC_OK;
 }
+
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr,
                                  RM_PageHeader * phr,
                                  BM_BufferPool * bm)
@@ -800,8 +837,6 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     phr->prevFreePage = NO_PAGE;
     return RC_OK;
 }
-
-
 
 static int getRecordOffsetValue(Schema *schema, int attrNum){
 	int offset = 0;
