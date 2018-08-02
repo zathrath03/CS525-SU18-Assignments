@@ -61,6 +61,7 @@ int static findFreeSlot(bitmap * bitMap);
 static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
 static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr, RM_PageHeader * phr,BM_BufferPool * bm);
+static int getRecordOffsetValue(Schema *schema, int attrNum);
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
@@ -514,18 +515,82 @@ RC createRecord (Record **record, Schema *schema){
     //And initialize to all 0's
     VALID_CALLOC(Record, rec, 0, sizeof(Record));
     rec->data = (char*) malloc(getRecordSize(schema));
-
+    *record = rec;
 
     return RC_OK;
 }
+
 RC freeRecord (Record *record){
+	free(record->data);
+	//record->id = NULL;
+	free(record);
+
     return RC_OK;
 }
+
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
+	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
+
+	//Value *attr_val = (Value *) malloc(sizeof(Value));
+	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
+
+	attr_val->dt = schema->dataTypes[attrNum];
+
+	// use memcpy
+	switch(schema->dataTypes[attrNum]) {
+		case DT_INT:{
+			memcpy(&(attr_val->v.intV), attr_offset, schema->typeLength[attrNum]);
+			//attr_val->v.intV = *(int *)attr_offset;
+			break;
+		}
+		case DT_STRING: {
+			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
+			break;
+		}
+		case DT_FLOAT: {
+			memcpy(&(attr_val->v.floatV), attr_offset, schema->typeLength[attrNum]);
+			//attr_val->v.floatV = *(float *)attr_offset;
+			break;
+		}
+		case DT_BOOL: {
+			memcpy(&(attr_val->v.boolV), attr_offset, schema->typeLength[attrNum]);
+			//attr_val->v.boolV = *(bool *)attr_offset;
+			break;
+		}
+	}
+
+	*value = attr_val;
     return RC_OK;
 }
+
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
-    return RC_OK;
+	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
+
+	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
+
+	switch(schema->dataTypes[attrNum]) {
+		case DT_INT:{
+			memcpy(attr_offset, &(attr_val->v.intV), schema->typeLength[attrNum]);
+			//*(int *)attr_offset = attr_val->v.intV;
+			break;
+		}
+		case DT_STRING: {
+			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
+			break;
+		}
+		case DT_FLOAT: {
+			memcpy(attr_offset, &(attr_val->v.floatV), schema->typeLength[attrNum]);
+			//*(float *)attr_offset = attr_val->v.floatV;
+			break;
+		}
+		case DT_BOOL: {
+			memcpy(attr_offset, &(attr_val->v.boolV), schema->typeLength[attrNum]);
+			//*(bool *)attr_offset = attr_val->v.boolV;
+			break;
+		}
+	}
+
+	return RC_OK;
 }
 
 /*********************************************************************
@@ -736,6 +801,15 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     return RC_OK;
 }
 
+
+
+static int getRecordOffsetValue(Schema *schema, int attrNum){
+	int offset = 0;
+	for(int i = 0; i < attrNum; i++) {
+		offset += schema->typeLength[i];
+	}
+	return offset;
+}
 /*********************************************************************
 *
 *               PAGEFILE HEADER GETTERS AND SETTERS
