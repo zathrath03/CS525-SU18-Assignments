@@ -171,8 +171,10 @@ RC openTable (RM_TableData *rel, char *name){
     rel->name = name;
     rel->schema = schema;
     rel->bufferPool = bm;
-    // may need to come back and add closing the file depending
-        //on how it interacts with the buffer mgr functions
+    // close the page file
+    ASSERT_RC_OK(closePageFile(&fHandle));
+    // unpin page with pageFile header
+    ASSERT_RC_OK(unpinPage(bm, &pfHdr));
 
     return RC_OK;
 }
@@ -187,11 +189,14 @@ RC closeTable (RM_TableData *rel){
     if(!rel)
         return RC_RM_INIT_ERROR;
     // shutdown the buffer pool (which forces a pool flush)
-    // close the page file
-    // free BM_BufferPool pointer
-        //should we add this back to shutdownBufferPool()?
-    // free rel->mgmtData and rel->schema pointers
-        //don't free rel->name since it's allocated by the caller
+    RC returnCode = RC_INIT;
+    ASSERT_RC_OK(shutdownBufferPool(rel->bufferPool));
+    // free memory allocated for arrays in schema
+    ASSERT_RC_OK(freeSchema(rel->schema));
+    // free BM_BufferPool pointer & rel->schema pointer
+    free(rel->bufferPool);
+    free(rel->schema);
+    // don't free rel->name since it's allocated by the caller
     return RC_OK;
 }
 
@@ -200,7 +205,11 @@ deleteTable deletes the underlying page file
 INPUT: name of the pageFile where the table is stored
 *********************************************************************/
 RC deleteTable (char *name){
+    // validate input
+    if(!name)
+        return RC_RM_INIT_ERROR;
     // destroyPageFile(name)
+    destroyPageFile(name);
     return RC_OK;
 }
 
@@ -210,10 +219,18 @@ INPUT: initialized RM_TableData of interest
 *********************************************************************/
 int getNumTuples (RM_TableData *rel){
     // validate input
+    if(!rel)
+        return RC_RM_INIT_ERROR;
     // pin the page with the pageFile header
+    BM_PageHandle pfHdr;
+    RC returnCode = RC_INIT;
+    ASSERT_RC_OK(pinPage(rel->bufferPool, &pfHdr, 0));
     // read numTuples from the header
+    int numTuples = getNumTuplesPF(pfHdr.data);
+    // unpin the page with the pageFile header
+    ASSERT_RC_OK(unpinPage(rel->bufferPool, &pfHdr));
     // return numTuples
-    return 0;
+    return numTuples;
 }
 
 /*********************************************************************
@@ -258,7 +275,7 @@ RC insertRecord (RM_TableData *rel, Record *record){
     //update record->id.slot
     record->id.slot = nextFreeSlot;
     //read location of next free slot from current slot
-    int recordSize = getRecordSize(rel->schema);
+    int recordSize = getRecordSizePF(pageFileHeader.data);
     //maybe put this into a macro
     char * slotPtr = (char*) &pageToInsert+sizeof(RM_PageHeader)
     + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
@@ -309,7 +326,7 @@ RC deleteRecord (RM_TableData *rel, RID id){
     ASSERT_RC_OK(pinPage(bm,&pageToDelete,pageNum));
     //find free slot using pageHeader bitMap
     RM_PageHeader * phr = (RM_PageHeader *) &pageToDelete.data;
-    int recordSize = getRecordSize(rel->schema);
+    int recordSize = getRecordSizePF(pageFileHeader.data);
     //delete the record at id.slot
         //(offset by slot*recordSize+sizeof(short))
     char * slotPtr = (char*) &pageToDelete+sizeof(RM_PageHeader)
