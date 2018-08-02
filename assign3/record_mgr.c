@@ -42,7 +42,7 @@ Offset Macros for retrieving data from the PageFile header
 #define keySizeOffset schemaOffset + ((2*numAttr)+1)*sizeof(unsigned short)
 #define keyAttrOffset(i) keySizeOffset + i*sizeof(unsigned short)
 /**firstNameOffset requires defining keySize**/
-#define firstNameOffset keySizeOffset + keySize*sizeof(unsigned short)
+#define attrNamesOffset keySizeOffset + keySize*sizeof(unsigned short)
 
 /*********************************************************************
 Offset Macros for retrieving data from the Page header
@@ -63,19 +63,22 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, B
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr, RM_PageHeader * phr,BM_BufferPool * bm);
 
 // Prototypes for getters and setters for pagefile header data
-static unsigned short getRecordSizePF(BM_Frame *pframe);
-static void setRecordSizePF(BM_Frame *pframe, unsigned short recordSize);
-static unsigned int getNumTuplesPF(BM_Frame *pframe);
-static void setNumTuplesPF(BM_Frame *pframe, unsigned int numTuples);
-static unsigned int getNextFreePage(BM_Frame *pframe);
-static void setNextFreePage(BM_Frame *pframe, unsigned int nextFreePage);
-static unsigned short getNumSlotsPerPage(BM_Frame *pframe);
-static unsigned short getSchemaSize(BM_Frame *pframe);
-static unsigned short getSchema(BM_Frame *pframe, Schema *schema);
-static DataType getIthDataType(BM_Frame *pframe, int ithSlot);
-static unsigned short getIthTypeLength(BM_Frame *pframe, int ithSlot);
-static unsigned short getKeySize(BM_Frame *pframe);
-static char* getIthAttrName(BM_Frame *pframe, int ithSlot, char* attrName);
+static unsigned short getRecordSizePF(char *pfHdrFrame);
+static void setRecordSizePF(char *pfHdrFrame, unsigned short recordSize);
+static unsigned int getNumTuplesPF(char *pfHdrFrame);
+static void setNumTuplesPF(char *pfHdrFrame, unsigned int numTuples);
+static unsigned int getNextFreePage(char *pfHdrFrame);
+static void setNextFreePage(char *pfHdrFrame, unsigned int nextFreePage);
+static unsigned short getNumSlotsPerPage(char *pfHdrFrame);
+static unsigned short getSchemaSize(char *pfHdrFrame);
+static void getSchema(char *pfHdrFrame, Schema *schema);
+static unsigned short getNumAttr(char *pfHdrFrame);
+static DataType getIthDataType(char *pfHdrFrame, int ithSlot);
+static unsigned short getIthTypeLength(char *pfHdrFrame, int ithSlot);
+static unsigned short getKeySize(char *pfHdrFrame);
+static unsigned short getIthKeyAttr(char *pfHdrFrame, int ithSlot);
+static unsigned short getIthNameLength(char *pfHdrFrame, int ithSlot);
+static char* getIthAttrName(char *pfHdrFrame, int ithSlot);
 
 /*********************************************************************
 * Notes:
@@ -147,16 +150,29 @@ INPUT:
     *name: valid string file name
 *********************************************************************/
 RC openTable (RM_TableData *rel, char *name){
+    RC returnCode = RC_INIT;
     // validate input
+    if(!rel || !name)
+        return RC_RM_INIT_ERROR;
     // open the page file
+    SM_FileHandle fHandle;
+    ASSERT_RC_OK(openPageFile(name, &fHandle));
     // initialize a buffer pool
-        // ?? How many pages should we use?
+    VALID_CALLOC(BM_BufferPool, bm, 1, sizeof(BM_BufferPool));
+    ASSERT_RC_OK(initBufferPool(bm, name, 100000, RS_LRU, NULL));
     // pin page with pageFile header
+    BM_PageHandle pfHdr;
+    ASSERT_RC_OK(pinPage(bm, &pfHdr, 0));
     // create a pointer and allocate memory for a schema struct
-    // **populate the schema struct with the schema from disk**
-    // initialize rel->schema
-    // initialize rel->name = name;
-    // initialize rel->mgmtData
+    VALID_CALLOC(Schema, schema, 1, sizeof(Schema));
+    // populate the schema struct with the schema from disk
+    getSchema(pfHdr.data, schema);
+    // initialize RM_TableData
+    rel->name = name;
+    rel->schema = schema;
+    rel->bufferPool = bm;
+    // may need to come back and add closing the file depending
+        //on how it interacts with the buffer mgr functions
 
     return RC_OK;
 }
@@ -168,6 +184,8 @@ INPUT: pointer to an initialized RM_TableData struct
 *********************************************************************/
 RC closeTable (RM_TableData *rel){
     // validate input
+    if(!rel)
+        return RC_RM_INIT_ERROR;
     // shutdown the buffer pool (which forces a pool flush)
     // close the page file
     // free BM_BufferPool pointer
@@ -706,50 +724,124 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
 *               PAGEFILE HEADER GETTERS AND SETTERS
 *
 *********************************************************************/
-static unsigned short getRecordSizePF(BM_Frame *pframe){
-    unsigned short recordSize = *(unsigned short*) (pframe + recordSizeOffset);
+static unsigned short getRecordSizePF(char *pfHdrFrame){
+    unsigned short recordSize;
+    memcpy(&recordSize, pfHdrFrame + recordSizeOffset, sizeof(unsigned short));
     return recordSize;
 }
-static void setRecordSizePF(BM_Frame *pframe, unsigned short recordSize){
-    unsigned short *recordSizePtr = (unsigned short*) (pframe + recordSizeOffset);
-    *recordSizePtr = recordSize;
+static void setRecordSizePF(char *pfHdrFrame, unsigned short recordSize){
+    memcpy(pfHdrFrame + recordSizeOffset, &recordSize, sizeof(unsigned short));
 }
-static unsigned int getNumTuplesPF(BM_Frame *pframe){
-    unsigned int numTuples = *(unsigned int*) (pframe + numTuplesOffset);
+static unsigned int getNumTuplesPF(char *pfHdrFrame){
+    unsigned int numTuples;
+    memcpy(&numTuples, pfHdrFrame + numTuplesOffset, sizeof(unsigned int));
     return numTuples;
 }
-static void setNumTuplesPF(BM_Frame *pframe, unsigned int numTuples){
-    unsigned int *numTuplesPtr = (unsigned int*) (pframe + numTuplesOffset);
-    *numTuplesPtr = numTuples;
+static void setNumTuplesPF(char *pfHdrFrame, unsigned int numTuples){
+    memcpy(pfHdrFrame + numTuplesOffset, &numTuples, sizeof(unsigned int));
 }
-static unsigned int getNextFreePage(BM_Frame *pframe){
-    unsigned int nextFreePage = *(unsigned int*) (pframe + nextFreePageOffset);
+static unsigned int getNextFreePage(char *pfHdrFrame){
+    unsigned int nextFreePage;
+    memcpy(&nextFreePage, pfHdrFrame + nextFreePageOffset, sizeof(unsigned int));
     return nextFreePage;
 }
-static void setNextFreePage(BM_Frame *pframe, unsigned int nextFreePage){
-    unsigned int *nextFreePagePtr = (unsigned int*) (pframe + numTuplesOffset);
-    *nextFreePagePtr = nextFreePage;
+static void setNextFreePage(char *pfHdrFrame, unsigned int nextFreePage){
+    memcpy(pfHdrFrame + nextFreePageOffset, &nextFreePage, sizeof(unsigned int));
 }
-static unsigned short getNumSlotsPerPage(BM_Frame *pframe){
-    unsigned short numSlotsPerPage = *(unsigned short*) (pframe + numSlotsPerPageOffset);
+static unsigned short getNumSlotsPerPage(char *pfHdrFrame){
+    unsigned short numSlotsPerPage;
+    memcpy(&numSlotsPerPage, pfHdrFrame + numSlotsPerPageOffset, sizeof(unsigned short));
     return numSlotsPerPage;
 }
-static unsigned short getSchemaSize(BM_Frame *pframe){
-    unsigned short schemaSize = *(unsigned short*) (pframe + schemaSizeOffset);
+static unsigned short getSchemaSize(char *pfHdrFrame){
+    unsigned short schemaSize;
+    memcpy(&schemaSize, pfHdrFrame + schemaSizeOffset, sizeof(unsigned short));
     return schemaSize;
 }
-static unsigned short getSchema(BM_Frame *pframe, Schema *schema){
-    return 0;
+static void getSchema(char *pfHdrFrame, Schema *schema){
+    //store values of non-array variables
+    schema->numAttr = getNumAttr(pfHdrFrame);
+    schema->keySize = getKeySize(pfHdrFrame);
+    // allocate memory for variable length arrays in schema struct
+    VALID_CALLOC(char*, attrNames, schema->numAttr, sizeof(char*));
+    VALID_CALLOC(DataType, dataTypes, schema->numAttr, sizeof(DataType));
+    VALID_CALLOC(int, typeLength, schema->numAttr, sizeof(int));
+    VALID_CALLOC(int, keyAttrs, schema->keySize, sizeof(int));
+    //store values and pointers in schema struct
+    schema->attrNames = attrNames;
+    schema->dataTypes = dataTypes;
+    schema->typeLength = typeLength;
+    schema->keyAttrs = keyAttrs;
+    //Populate arrays in the schema
+    for(int i = 0; i < schema->numAttr; i++){
+        schema->dataTypes[i] = getIthDataType(pfHdrFrame, i);
+        schema->typeLength[i] = getIthTypeLength(pfHdrFrame, i);
+        schema->attrNames[i] = getIthAttrName(pfHdrFrame, i);
+    }
+    for(int i = 0; i < schema->keySize; i++){
+        keyAttrs[i] = getIthKeyAttr(pfHdrFrame, i);
+    }
 }
-static DataType getIthDataType(BM_Frame *pframe, int ithSlot){
-    return DT_INT;
+static unsigned short getNumAttr(char *pfHdrFrame){
+    unsigned short numAttr;
+    memcpy(&numAttr, pfHdrFrame + numAttrOffset, sizeof(unsigned short));
+    return numAttr;
 }
-static unsigned short getIthTypeLength(BM_Frame *pframe, int ithSlot){
-    return 0;
+static DataType getIthDataType(char *pfHdrFrame, int ithSlot){
+    unsigned short dataType;
+    memcpy(&dataType, pfHdrFrame + dataTypeOffset(ithSlot), sizeof(unsigned short));
+    switch(dataType){
+    case 0:
+        return DT_INT;
+    case 1:
+        return DT_STRING;
+    case 2:
+        return DT_FLOAT;
+    case 3:
+        return DT_BOOL;
+    default:
+        return DT_INT;
+    }
 }
-static unsigned short getKeySize(BM_Frame *pframe){
-    return 0;
+static unsigned short getIthTypeLength(char *pfHdrFrame, int ithSlot){
+    unsigned short typeLength;
+    memcpy(&typeLength, pfHdrFrame + typeLengthOffset(ithSlot), sizeof(unsigned short));
+    return typeLength;
 }
-static char* getIthAttrName(BM_Frame *pframe, int ithSlot, char* attrName){
+static unsigned short getKeySize(char *pfHdrFrame){
+    unsigned short keySize;
+    unsigned short numAttr = getNumAttr(pfHdrFrame);
+    memcpy(&keySize, pfHdrFrame + keySizeOffset, sizeof(unsigned short));
+    return keySize;
+}
+static unsigned short getIthKeyAttr(char *pfHdrFrame, int ithSlot){
+    unsigned short keyAttr;
+    unsigned short numAttr = getNumAttr(pfHdrFrame);
+    memcpy(&keyAttr, pfHdrFrame + keyAttrOffset(ithSlot), sizeof(unsigned short));
+    return keyAttr;
+}
+static unsigned short getIthNameLength(char *pfHdrFrame, int ithSlot){
+    unsigned short nameLength;
+    unsigned short numAttr = getNumAttr(pfHdrFrame);
+    unsigned short keySize = getKeySize(pfHdrFrame);
+    char *ptr = pfHdrFrame + attrNamesOffset;
+    for(int i = 0; i <= ithSlot; i++){
+        memcpy(&nameLength, ptr, sizeof(unsigned short));
+        ptr = ptr + nameLength + sizeof(unsigned short);
+    }
+    return nameLength;
+}
+static char* getIthAttrName(char *pfHdrFrame, int ithSlot){
+    unsigned short nameLength;
+    unsigned short numAttr = getNumAttr(pfHdrFrame);
+    unsigned short keySize = getKeySize(pfHdrFrame);
+    char *ptr = pfHdrFrame + attrNamesOffset + sizeof(unsigned short);
+    for(int i = 0; i < ithSlot; i++){
+        nameLength = getIthNameLength(pfHdrFrame, i);
+        ptr = ptr + nameLength + sizeof(unsigned short);
+    }
+    nameLength = getIthNameLength(pfHdrFrame, ithSlot);
+    VALID_CALLOC(char, attrName, 1, nameLength+1); //room for null char
+    memcpy(&attrName, ptr, nameLength);
     return attrName;
 }
