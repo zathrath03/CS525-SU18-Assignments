@@ -61,6 +61,7 @@ int static findFreeSlot(bitmap * bitMap);
 static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
 static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr, RM_PageHeader * phr,BM_BufferPool * bm);
+static int getRecordOffsetValue(Schema *schema, int attrNum);
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
@@ -511,37 +512,15 @@ RC freeRecord (Record *record){
 }
 
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
-	char *attr_offset = record->data;
+	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
 
 	//Value *attr_val = (Value *) malloc(sizeof(Value));
 	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
 
 	attr_val->dt = schema->dataTypes[attrNum];
-	//calculate attribute offset to retrieve attribute value
-	//use getter functions to get offset
-	for(int i = 0; i < attrNum; i++) {
-		switch(schema->dataTypes[i]){
-		case DT_INT:{
-			attr_offset += sizeof(int);
-			break;
-		}
-		case DT_STRING: {
-			attr_offset += (schema->typeLength[i]) * sizeof(char);
-			break;
-		}
-		case DT_FLOAT: {
-			attr_offset += sizeof(float);
-			break;
-		}
-		case DT_BOOL: {
-			attr_offset += sizeof(bool);
-			break;
-		}
-		default:
-			break;
-	}
-// use memcpy
-	switch(schema->dataTypes[i]) {
+
+	// use memcpy
+	switch(schema->dataTypes[attrNum]) {
 		case DT_INT:{
 			memcpy(&(attr_val->v.intV), attr_offset, schema->typeLength[attrNum]);
 			//attr_val->v.intV = *(int *)attr_offset;
@@ -568,36 +547,11 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 }
 
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
-	char *attr_offset = record->data;
+	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
 
 	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
 
-	//calculate attribute offset to set attribute value
-	//use getter functions to get offset
-	for(int i = 0; i < attrNum; i++) {
-		switch(schema->dataTypes[i]){
-		case DT_INT:{
-			attr_offset += sizeof(int);
-			break;
-		}
-		case DT_STRING: {
-			attr_offset += (schema->typeLength[i]) * sizeof(char);
-			break;
-		}
-		case DT_FLOAT: {
-			attr_offset += sizeof(float);
-			break;
-		}
-		case DT_BOOL: {
-			attr_offset += sizeof(bool);
-			break;
-		}
-		default:
-			break;
-	}
-
-
-	switch(schema->dataTypes[i]) {
+	switch(schema->dataTypes[attrNum]) {
 		case DT_INT:{
 			memcpy(attr_offset, &(attr_val->v.intV), schema->typeLength[attrNum]);
 			//*(int *)attr_offset = attr_val->v.intV;
@@ -830,6 +784,15 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     return RC_OK;
 }
 
+
+
+static int getRecordOffsetValue(Schema *schema, int attrNum){
+	int offset = 0;
+	for(int i = 0; i < attrNum; i++) {
+		offset += schema->typeLength[i];
+	}
+	return offset;
+}
 /*********************************************************************
 *
 *               PAGEFILE HEADER GETTERS AND SETTERS
