@@ -493,28 +493,18 @@ RC createRecord (Record **record, Schema *schema){
     //Validate passed input
     if(!record || !schema)
       return RC_RM_INIT_ERROR;
-    //Allocate memory for the new record and the data
-    //of this record
+    //Allocate memory for the new record and its data
+    //And initialize to all 0's
     VALID_CALLOC(Record, rec, 0, sizeof(Record));
     rec->data = (char*) malloc(getRecordSize(schema));
+
 
     return RC_OK;
 }
 RC freeRecord (Record *record){
-    //free up memory allocated by the records data and then the record itself
-    free(record->data);
-    free(record);
-
     return RC_OK;
 }
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
-    //Validate passed input
-    if(!record || !schema || !attrNum || !value)
-      return RC_RM_INIT_ERROR;
-    //Allocate memory for our value in struct
-    VALID_CALLOC(Value, val, 0, sizeof(Value));
-
-
     return RC_OK;
 }
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
