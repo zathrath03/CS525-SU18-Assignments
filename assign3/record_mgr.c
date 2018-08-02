@@ -61,6 +61,7 @@ int static findFreeSlot(bitmap * bitMap);
 static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
 static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr, RM_PageHeader * phr,BM_BufferPool * bm);
+static int getRecordOffsetValue(Schema *schema, int attrNum);
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
@@ -171,8 +172,10 @@ RC openTable (RM_TableData *rel, char *name){
     rel->name = name;
     rel->schema = schema;
     rel->bufferPool = bm;
-    // may need to come back and add closing the file depending
-        //on how it interacts with the buffer mgr functions
+    // close the page file
+    ASSERT_RC_OK(closePageFile(&fHandle));
+    // unpin page with pageFile header
+    ASSERT_RC_OK(unpinPage(bm, &pfHdr));
 
     return RC_OK;
 }
@@ -187,11 +190,13 @@ RC closeTable (RM_TableData *rel){
     if(!rel)
         return RC_RM_INIT_ERROR;
     // shutdown the buffer pool (which forces a pool flush)
-    // close the page file
+    RC returnCode = RC_INIT;
+    ASSERT_RC_OK(shutdownBufferPool(rel->bufferPool));
+    // free memory allocated for arrays in schema
+    ASSERT_RC_OK(freeSchema(rel->schema));
     // free BM_BufferPool pointer
-        //should we add this back to shutdownBufferPool()?
-    // free rel->mgmtData and rel->schema pointers
-        //don't free rel->name since it's allocated by the caller
+    free(rel->bufferPool);
+    // don't free rel->name since it's allocated by the caller
     return RC_OK;
 }
 
@@ -200,7 +205,11 @@ deleteTable deletes the underlying page file
 INPUT: name of the pageFile where the table is stored
 *********************************************************************/
 RC deleteTable (char *name){
+    // validate input
+    if(!name)
+        return RC_RM_INIT_ERROR;
     // destroyPageFile(name)
+    destroyPageFile(name);
     return RC_OK;
 }
 
@@ -210,10 +219,18 @@ INPUT: initialized RM_TableData of interest
 *********************************************************************/
 int getNumTuples (RM_TableData *rel){
     // validate input
+    if(!rel)
+        return RC_RM_INIT_ERROR;
     // pin the page with the pageFile header
+    BM_PageHandle pfHdr;
+    RC returnCode = RC_INIT;
+    ASSERT_RC_OK(pinPage(rel->bufferPool, &pfHdr, 0));
     // read numTuples from the header
+    int numTuples = getNumTuplesPF(pfHdr.data);
+    // unpin the page with the pageFile header
+    ASSERT_RC_OK(unpinPage(rel->bufferPool, &pfHdr));
     // return numTuples
-    return 0;
+    return numTuples;
 }
 
 /*********************************************************************
@@ -258,7 +275,7 @@ RC insertRecord (RM_TableData *rel, Record *record){
     //update record->id.slot
     record->id.slot = nextFreeSlot;
     //read location of next free slot from current slot
-    int recordSize = getRecordSize(rel->schema);
+    int recordSize = getRecordSizePF(pageFileHeader.data);
     //maybe put this into a macro
     char * slotPtr = (char*) &pageToInsert+sizeof(RM_PageHeader)
     + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
@@ -309,7 +326,7 @@ RC deleteRecord (RM_TableData *rel, RID id){
     ASSERT_RC_OK(pinPage(bm,&pageToDelete,pageNum));
     //find free slot using pageHeader bitMap
     RM_PageHeader * phr = (RM_PageHeader *) &pageToDelete.data;
-    int recordSize = getRecordSize(rel->schema);
+    int recordSize = getRecordSizePF(pageFileHeader.data);
     //delete the record at id.slot
         //(offset by slot*recordSize+sizeof(short))
     char * slotPtr = (char*) &pageToDelete+sizeof(RM_PageHeader)
@@ -465,14 +482,53 @@ RC closeScan (RM_ScanHandle *scan){
 *                        SCHEMA FUNCTIONS
 *
 *********************************************************************/
+/*********************************************************************
+getRecordSize sums the typeLengths of the attributes to determine
+recordSize
+INPUT: initialized Schema
+RETURNS: the size of a single record for the provided schema
+*********************************************************************/
 int getRecordSize (Schema *schema){
-    return 0;
+    int recordSize = 0;
+    for(int i = 0; i < schema->numAttr; i++){
+        recordSize += schema->typeLength[i];
+    }
+    return recordSize;
 }
+/*********************************************************************
+createSchema allocates memory for a Schema struct and points each
+member of the struct to the parameters passed to the function
+INPUT: Initialized values for all members of the Schema struct
+*********************************************************************/
 Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
     VALID_CALLOC(Schema, schema, 1, sizeof(Schema));
+
+    schema->numAttr = numAttr;
+    schema->attrNames = attrNames;
+    schema->dataTypes = dataTypes;
+    schema->typeLength = typeLength;
+    schema->keyAttrs = keys;
+    schema->keySize = keySize;
     return schema;
 }
+/*********************************************************************
+freeSchema frees all memory associated with a Schema struct, including
+the memory for the struct itself
+INPUT: initialized Schema
+*********************************************************************/
 RC freeSchema (Schema *schema){
+    for(int i = 0; i < schema->numAttr; i++){
+        free(schema->attrNames[i]);
+        schema->attrNames[i] = NULL;
+    }
+    free(schema->dataTypes);
+    schema->dataTypes = NULL;
+    free(schema->typeLength);
+    schema->typeLength = NULL;
+    free(schema->keyAttrs);
+    schema->keyAttrs = NULL;
+    free(schema);
+    schema = NULL;
     return RC_OK;
 }
 
@@ -497,18 +553,82 @@ RC createRecord (Record **record, Schema *schema){
     //And initialize to all 0's
     VALID_CALLOC(Record, rec, 0, sizeof(Record));
     rec->data = (char*) malloc(getRecordSize(schema));
-
+    *record = rec;
 
     return RC_OK;
 }
+
 RC freeRecord (Record *record){
+	free(record->data);
+	//record->id = NULL;
+	free(record);
+
     return RC_OK;
 }
+
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
+	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
+
+	//Value *attr_val = (Value *) malloc(sizeof(Value));
+	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
+
+	attr_val->dt = schema->dataTypes[attrNum];
+
+	// use memcpy
+	switch(schema->dataTypes[attrNum]) {
+		case DT_INT:{
+			memcpy(&(attr_val->v.intV), attr_offset, schema->typeLength[attrNum]);
+			//attr_val->v.intV = *(int *)attr_offset;
+			break;
+		}
+		case DT_STRING: {
+			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
+			break;
+		}
+		case DT_FLOAT: {
+			memcpy(&(attr_val->v.floatV), attr_offset, schema->typeLength[attrNum]);
+			//attr_val->v.floatV = *(float *)attr_offset;
+			break;
+		}
+		case DT_BOOL: {
+			memcpy(&(attr_val->v.boolV), attr_offset, schema->typeLength[attrNum]);
+			//attr_val->v.boolV = *(bool *)attr_offset;
+			break;
+		}
+	}
+
+	*value = attr_val;
     return RC_OK;
 }
+
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
-    return RC_OK;
+	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
+
+	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
+
+	switch(schema->dataTypes[attrNum]) {
+		case DT_INT:{
+			memcpy(attr_offset, &(attr_val->v.intV), schema->typeLength[attrNum]);
+			//*(int *)attr_offset = attr_val->v.intV;
+			break;
+		}
+		case DT_STRING: {
+			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
+			break;
+		}
+		case DT_FLOAT: {
+			memcpy(attr_offset, &(attr_val->v.floatV), schema->typeLength[attrNum]);
+			//*(float *)attr_offset = attr_val->v.floatV;
+			break;
+		}
+		case DT_BOOL: {
+			memcpy(attr_offset, &(attr_val->v.boolV), schema->typeLength[attrNum]);
+			//*(bool *)attr_offset = attr_val->v.boolV;
+			break;
+		}
+	}
+
+	return RC_OK;
 }
 
 /*********************************************************************
@@ -517,12 +637,10 @@ RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
 *
 *********************************************************************/
 
-
-/*****************************************
-checks if the bitMap has a freeslot
-if not it return bitMap size as the next
-free slot index
-*****************************************/
+/*********************************************************************
+checks if the bitMap has a free slot if not it return bitMap size as
+the next free slot index
+*********************************************************************/
 int static findFreeSlot(bitmap * bitMap){
     int mapSize = bitMap->bits;
     for(int i=0; i<mapSize;i++)
@@ -651,6 +769,7 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
     free(strLen);
     return RC_OK;
 }
+
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr,
                                  RM_PageHeader * phr,
                                  BM_BufferPool * bm)
@@ -719,6 +838,13 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     return RC_OK;
 }
 
+static int getRecordOffsetValue(Schema *schema, int attrNum){
+	int offset = 0;
+	for(int i = 0; i < attrNum; i++) {
+		offset += schema->typeLength[i];
+	}
+	return offset;
+}
 /*********************************************************************
 *
 *               PAGEFILE HEADER GETTERS AND SETTERS
