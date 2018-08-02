@@ -125,7 +125,7 @@ RC createTable (char *name, Schema *schema){
     if(!name || !schema)
         return RC_RM_INIT_ERROR;
     //make sure a page file with that name doesn't already exist
-    if(access(name, F_OK))
+    if(!access(name, F_OK))
         return RC_RM_FILE_ALREADY_EXISTS;
     //create a page file
     ASSERT_RC_OK(createPageFile(name));
