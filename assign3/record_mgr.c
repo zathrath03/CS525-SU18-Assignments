@@ -450,7 +450,11 @@ RC getRecord (RM_TableData *rel, RID id, Record *record){
 *                        SCAN FUNCTIONS
 *
 *********************************************************************/
-//initializes the RM_ScanHandle data structure passed as an argument to startScan.
+/*********************************************************************
+startScan: Initializes the RM_ScanHandle data structure
+INPUT: initialized relation, instance of ScanHandle, and the condition
+RETURNS: RC_OK
+*********************************************************************/
 RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond){
     //Validation of inputs
     if(!rel || !scan || !cond)  //If input is invalid then return error code
@@ -460,19 +464,32 @@ RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond){
     scan->rel = rel;        //Store the relation into the rel field
     return RC_OK;
 }
-//next method should return the next tuple that fulfills the scan condition
-//If NULL is passed as a scan condition, then all tuples of the table should be returned
+
+/*********************************************************************
+next: Looks for the next tuple that fulfills the scan condition and
+returns it.
+INPUT: Instance of ScanHandle (if NULL is passed, then all tuples of
+       the table should be returned), a Record
+Return: RC_RM_NO_MORE_TUPLES once scan is completed
+        RC_OK otherwise
+*********************************************************************/
 RC next (RM_ScanHandle *scan, Record *record){
     //Validation of inputs
     if(!scan || !record)    //If input is invalid then return error code
       return RC_RM_INIT_ERROR;
 
-//    if()
+    //loop through each index in the relation (stored in scan->rel)
+    //Compare each record in the table and see if it satisfies the condition:
+            //
 
     return RC_OK;
     //next should return RC_RM_NO_MORE_TUPLES once the scan is completed and RC_OK otherwise
 }
-//Return RC_OK
+/*********************************************************************
+closeScan: Finishes the scan
+INPUT: Instance of ScanHandle
+RETURNS: RC_OK
+*********************************************************************/
 RC closeScan (RM_ScanHandle *scan){
     return RC_OK;
 }
