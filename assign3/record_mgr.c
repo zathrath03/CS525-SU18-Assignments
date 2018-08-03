@@ -536,7 +536,16 @@ RC freeSchema (Schema *schema){
 *                        ATTRIBUTE FUNCTIONS
 *
 *********************************************************************/
-//Create a record for the schema passed in
+/*********************************************************************
+Allocates memory for a Record struct along with the the memory for
+a table record which is equivalent to the sum of the size of all the
+attributes specified in the schema.
+If address of record or schema does not exist, return INIT error
+INPUT:
+	**record: pointer to a pointer of the newly allocated memory
+			  for Record
+	*schema: pointer to pre initialized schema
+*********************************************************************/
 RC createRecord (Record **record, Schema *schema){
     //Validate passed input
     if(!record || !schema)
@@ -550,6 +559,12 @@ RC createRecord (Record **record, Schema *schema){
     return RC_OK;
 }
 
+/*********************************************************************
+Frees all memory associated with Record struct along with the
+the memory for the struct
+INPUT:
+	*record: pointer of the populated record struct
+*********************************************************************/
 RC freeRecord (Record *record){
 	free(record->data);
 	//record->id = NULL;
@@ -558,6 +573,15 @@ RC freeRecord (Record *record){
     return RC_OK;
 }
 
+/*********************************************************************
+Gets the value of an attribute(specified by 'attrNum') from the
+record and stores in *value
+INPUT:
+	*record: initialized record to retrieve the attribute from from
+	*schema: initialized schema - used for locating the attribute in record
+	attrNum: The index of the attribute in the record
+	**value: the pointer where the retrieved attribute value is stored
+*********************************************************************/
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
 
@@ -593,6 +617,15 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
     return RC_OK;
 }
 
+/*********************************************************************
+Sets the value of an attribute(specified by 'attrNum') from the
+*value to the *record
+INPUT:
+	*record: initialized record where value is to be updated
+	*schema: initialized schema - used for locating the attribute in record
+	attrNum: The index of the attribute in the record to be updated
+	*value: pointer to the new value the record is to be updated with
+*********************************************************************/
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
 	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
 
@@ -831,6 +864,13 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     return RC_OK;
 }
 
+/*********************************************************************
+Gets the byte offset value of an attribute in the record for setting
+new value to the attribute or for retrieving the value from the record
+INPUT:
+	*schema: initialized schema - used for locating the attribute in record
+	attrNum: The index of the attribute in the record
+*********************************************************************/
 static int getRecordOffsetValue(Schema *schema, int attrNum){
 	int offset = 0;
 	for(int i = 0; i < attrNum; i++) {
