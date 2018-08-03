@@ -134,6 +134,7 @@ RC createTable (char *name, Schema *schema){
     ASSERT_RC_OK(openPageFile(name, &fHandle));
     //write page file header
     VALID_CALLOC(SM_PageHandle, pHandle, 1, PAGE_SIZE);
+    //SM_PageHandle *pHandle = (SM_PageHandle*) calloc(1, PAGE_SIZE);
     ASSERT_RC_OK(preparePFHdr(schema, pHandle));
     ASSERT_RC_OK(writeBlock(0, &fHandle, *pHandle));
     //close the page file
@@ -553,13 +554,6 @@ RC freeSchema (Schema *schema){
 *
 *                        ATTRIBUTE FUNCTIONS
 *
-#define VALID_CALLOC(type, varName, number, size)   \
-    type *varName = (type *) calloc(number, size);  \
-    if(!varName){                                   \
-        printError(RC_BM_MEMORY_ALOC_FAIL);         \
-        exit(-1);                                   \
-    }
-
 *********************************************************************/
 //Create a record for the schema passed in
 RC createRecord (Record **record, Schema *schema){
@@ -746,38 +740,40 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
     unsigned short schemaSize = (2 + 3*numAttr + keySize) * sizeof(unsigned short) + sizeOfAttrNames;
 
     //Populating the pageHandle with the data
-    unsigned short curOffset = 0;
+    char* curOffset = (char*) pHandle;
 
-    *pHandle[curOffset] = recordSize;
+    memcpy(curOffset, &recordSize, sizeof(recordSize));
     curOffset += sizeof(recordSize);
-    *pHandle[curOffset] = numTuples;
+    memcpy(curOffset, &numTuples, sizeof(numTuples));
     curOffset += sizeof(numTuples);
-    *pHandle[curOffset] = nextFreePage;
+    memcpy(curOffset, &nextFreePage, sizeof(nextFreePage));
     curOffset += sizeof(nextFreePage);
-    *pHandle[curOffset] = numSlotsPerPage;
+    memcpy(curOffset, &numSlotsPerPage, sizeof(numSlotsPerPage));
     curOffset += sizeof(numSlotsPerPage);
-    *pHandle[curOffset] = schemaSize;
+    memcpy(curOffset, &schemaSize, sizeof(schemaSize));
     curOffset += sizeof(schemaSize);
-    *pHandle[curOffset] = numAttr;
+    memcpy(curOffset, &numAttr, sizeof(numAttr));
     curOffset += sizeof(numAttr);
 
     for(int i = 0; i < 2*numAttr; i++){
-        *pHandle[curOffset] = typeAndLength[i];
+        memcpy(curOffset, &typeAndLength[i], sizeof(typeAndLength[i]));
         curOffset += sizeof(typeAndLength[i]);
     }
 
-    *pHandle[curOffset] = keySize;
+    memcpy(curOffset, &keySize, sizeof(keySize));
     curOffset += sizeof(keySize);
+    unsigned short temp;
 
     for(int i = 0; i<keySize; i++){
-        *pHandle[curOffset] = (unsigned short) schema->keyAttrs[i];
-        curOffset += sizeof((unsigned short) schema->keyAttrs[i]);
+        temp = (unsigned short)schema->keyAttrs[i];
+        memcpy(curOffset, &temp, sizeof(temp));
+        curOffset += sizeof(temp);
     }
 
     for(int i = 0; i < numAttr; i++){
-        *pHandle[curOffset] = strLen[i];
+        memcpy(curOffset, &strLen[i], sizeof(strLen[i]));
         curOffset += sizeof(strLen[i]);
-        pHandle[curOffset] = schema->attrNames[i];
+        memcpy(curOffset, &schema->attrNames[i], strLen[i]);
         curOffset += strLen[i];
     }
 
