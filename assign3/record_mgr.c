@@ -21,9 +21,9 @@
     }
 
 /**Must declare RC returnCode in function before using ASSERT_RC_OK**/
-#define ASSERT_RC_OK(functionCall)          \
-    returnCode = functionCall;                 \
-    if(returnCode != RC_OK )\
+#define ASSERT_RC_OK(functionCall)  \
+    returnCode = functionCall;      \
+    if(returnCode != RC_OK )        \
        return returnCode;
 
 /*********************************************************************
@@ -49,8 +49,6 @@ Offset Macros for retrieving data from the Page header
 *********************************************************************/
 #define bitmapOffset(i) i*sizeof(bitmap_type) //i is the bitmap->words
 
-
-
 /*********************************************************************
 *
 *                       FUNCTION PROTOTYPES
@@ -58,7 +56,7 @@ Offset Macros for retrieving data from the Page header
 *********************************************************************/
 // Prototypes for helper functions
 int static findFreeSlot(bitmap * bitMap);
-static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
+static RC preparePFHdr(Schema *schema, char *pHandle);
 static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr, RM_PageHeader * phr,BM_BufferPool * bm);
 static int getRecordOffsetValue(Schema *schema, int attrNum);
@@ -125,18 +123,18 @@ RC createTable (char *name, Schema *schema){
     if(!name || !schema)
         return RC_RM_INIT_ERROR;
     //make sure a page file with that name doesn't already exist
-    if(!access(name, F_OK))
-        return RC_RM_FILE_ALREADY_EXISTS;
+//    if(!access(name, F_OK))
+//        return RC_RM_FILE_ALREADY_EXISTS;
     //create a page file
     ASSERT_RC_OK(createPageFile(name));
     //open the page file
     SM_FileHandle fHandle;
     ASSERT_RC_OK(openPageFile(name, &fHandle));
     //write page file header
-    VALID_CALLOC(SM_PageHandle, pHandle, 1, PAGE_SIZE);
+    VALID_CALLOC(char, pHandle, 1, PAGE_SIZE);
     //SM_PageHandle *pHandle = (SM_PageHandle*) calloc(1, PAGE_SIZE);
     ASSERT_RC_OK(preparePFHdr(schema, pHandle));
-    ASSERT_RC_OK(writeBlock(0, &fHandle, *pHandle));
+    ASSERT_RC_OK(writeBlock(0, &fHandle, pHandle));
     //close the page file
     ASSERT_RC_OK(closePageFile(&fHandle));
     //free allocated memory
@@ -161,7 +159,7 @@ RC openTable (RM_TableData *rel, char *name){
     ASSERT_RC_OK(openPageFile(name, &fHandle));
     // initialize a buffer pool
     VALID_CALLOC(BM_BufferPool, bm, 1, sizeof(BM_BufferPool));
-    ASSERT_RC_OK(initBufferPool(bm, name, 100000, RS_LRU, NULL));
+    ASSERT_RC_OK(initBufferPool(bm, name, 1000, RS_LRU, NULL));
     // pin page with pageFile header
     BM_PageHandle pfHdr;
     ASSERT_RC_OK(pinPage(bm, &pfHdr, 0));
@@ -688,7 +686,7 @@ SCHEMA OFFSETS FROM START OF SCHEMA
     Offset to a specific attribute's name will need to be calculated
         using the strlen's
 *********************************************************************/
-static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
+static RC preparePFHdr(Schema *schema, char *pHandle){
     //validate input
     if(!schema || !pHandle)
         return RC_RM_INIT_ERROR;
@@ -697,7 +695,8 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
     unsigned short recordSize = (unsigned short) getRecordSize(schema);
     unsigned int numTuples = 0;
     unsigned int nextFreePage = 1;
-    unsigned short numSlotsPerPage = (unsigned short) (PAGE_SIZE / recordSize);
+    //numSlotsPerPage accounts for the bitmap and next and prev pointers
+    unsigned short numSlotsPerPage = (unsigned short) (PAGE_SIZE / ((recordSize + 0.125) + 2*sizeof(int)));
 
     //Retrieve existing data from schema
     unsigned short numAttr = (unsigned short) schema->numAttr;
@@ -745,12 +744,12 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
 
     memcpy(curOffset, &keySize, sizeof(keySize));
     curOffset += sizeof(keySize);
-    unsigned short temp;
+    unsigned short keyAttr;
 
-    for(int i = 0; i<keySize; i++){
-        temp = (unsigned short)schema->keyAttrs[i];
-        memcpy(curOffset, &temp, sizeof(temp));
-        curOffset += sizeof(temp);
+    for(int i = 0; i < keySize; i++){
+        keyAttr = (unsigned short)schema->keyAttrs[i];
+        memcpy(curOffset, &keyAttr, sizeof(keyAttr));
+        curOffset += sizeof(keyAttr);
     }
 
     for(int i = 0; i < numAttr; i++){
