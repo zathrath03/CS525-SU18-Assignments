@@ -699,7 +699,7 @@ RC createRecord (Record **record, Schema *schema){
     //Allocate memory for the new record and its data
     //And initialize to all 0's
     VALID_CALLOC(Record, rec, 0, sizeof(Record));
-    rec->data = (char*) malloc(getRecordSize(schema));
+    rec->data = (char*) calloc(1, getRecordSize(schema));
     *record = rec;
 
     return RC_OK;
