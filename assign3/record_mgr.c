@@ -61,11 +61,8 @@ static RC preparePFHdr(Schema *schema, char *pHandle);
 static RC deleteFromFreeLinkedList(char* pfhr,char *phr, BM_BufferPool*bm);
 static RC appendToFreeLinkedList(char * pfhr, char * phr,BM_BufferPool * bm);
 static int getAttrOffset(Schema *schema, int attrNum);
-<<<<<<< HEAD
 static RC findNewPageNum(RM_TableData * rel, unsigned int * nextFreePage);
-=======
 static unsigned short calcNumSlotsPerPage(unsigned short recordSize);
->>>>>>> 8f55e4e454d49fc8788265191aef86df68e0137e
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
