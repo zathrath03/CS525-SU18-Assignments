@@ -503,6 +503,8 @@ RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond){
 
     scan->mgmtData = cond;  //Store the condition into the mgmtData field
     scan->rel = rel;        //Store the relation into the rel field
+    scan->slotNum = 0;
+    scan->pageNum = 1;
     return RC_OK;
 }
 
@@ -515,10 +517,11 @@ Return: RC_RM_NO_MORE_TUPLES once scan is completed
         RC_OK otherwise
 *********************************************************************/
 RC next (RM_ScanHandle *scan, Record *record){
+    RC returnCode = RC_INIT;
     SM_FileHandle fHandle;
     BM_PageHandle pageFileHeader;
     BM_PageHandle curPage;//used to pin page to BufferPool
-    BM_BufferPool* bm = rel->bufferPool;
+    BM_BufferPool* bm = scan->rel->bufferPool;
     //Validation of inputs
     if(!record)    //If input is invalid then return error code
       return RC_RM_INIT_ERROR;
@@ -526,65 +529,49 @@ RC next (RM_ScanHandle *scan, Record *record){
     // open the page file
     ASSERT_RC_OK(openPageFile(scan->rel->name, &fHandle));
     //store number of pages in the fHandle into numPages
-    int numPages = fHandle->totalNumPages;
+    int numPages = fHandle.totalNumPages;
     ASSERT_RC_OK(closePageFile(&fHandle));
-    //pin the page with the pageFile header to bufferpool
+    //pin the pageFile header to bufferpool
     //Only need to do once
     ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
-    RM_PageFileHeader* pfhr = (RM_PageFileHeader *) &pageFileHeader.data;
+    char* pfhr = pageFileHeader.data;
+    VALID_CALLOC(Value, result, 1, sizeof(Value)); //Allocate mem for result in evalExpr
     //Iterate through the pages on disk and pin to bufferpool and search over bitmap of that page
-    for(int i=1; i<numPages; i++){
-      ASSERT_RC_OK(pinPage(bm,&curPage,i));
-      RM_PageHeader * phr = (RM_PageHeader *) &curPage.data;//used to find used slot
+    int recordSize = getRecordSize(scan->rel->schema);
+    for(; scan->pageNum<numPages; scan->pageNum++){
+      ASSERT_RC_OK(pinPage(bm,&curPage,scan->pageNum));
+      char * phr = curPage.data;//used to find used slot
       //point to bitmap in the current page
       //TODO: have address of bitmap be pointed by a variable (lets call it bitmap just for use in while loop)
-      bitmap = curPage.data + (2*sizeof(int));
+      bitmap * b = getBitMapPH(phr);
       //while we did not reach the end of the slot
-      int slot = 0;
-      while(slot <= pfhr->numSlotsPerPage){
+      while(scan->slotNum <= getNumSlotsPerPage(pfhr)){
         //utilize bitmap_read(bitmap, int n) to retrieve bit
         //if bit = 1, then store the data (record) at that position in the page into record->id.slot
-        if(bitmap_read(bitMap,slot)==1)
+        if(bitmap_read(b,scan->slotNum)==1)
         {
-          //We know that 'slot' held correct index
-          //store the data in that slot into record->id.slot
-          //Retrieve data from the relation in the slot'th index, and store in record->id.slot
-          record->id.slot = ---RETRIEVE---[(2* unsigned int) + bitmap.bits + (slot * getRecordSize(scan->rel->schema))];
-          //record->id.slot == phr->freeBitMap.array[bitmap.bits + (i * getRecordSize(scan->rel->schema))];
-          //Don't know exactly where to retrieve tuple from, maybe from:
-                  //scan->rel
-                  //bitmap.array
-                  //phr->freeBitmap.array
-
-
-          //Check if the record in record->id.slot fulfills the condition stored in scan->mgmtData
-          VALID_CALLOC(Value, result, 1, sizeof(Value));
-          evalExpr(record->id.slot, scan->rel->schema, scan->mgmtData, &result);
-          //if there's a match in the condition in tuple then
-          if(result->v.boolV){
+          char * slotPtr = phr;
+          slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+          slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+          slotPtr+= (scan->slotNum * recordSize );
+          ASSERT_RC_OK(evalExpr(record, scan->rel->schema, scan->mgmtData, &result));
+          if(result->v.boolV || scan->mgmtData == NULL){
             //if the condition matches, then update the scanHandle so that now has the tuple in it
-
+            memcpy(record->data, slotPtr, getRecordSize(scan->rel->schema));
+            record->id.page = scan->pageNum;
+            record->id.slot = scan->slotNum;
+            free(result);
+            return RC_OK;
           }
-          //If condition is Null
-          if(scan->mgmtData == NULL){
-            return record->id.slot;
-          }
-          //After correct record is found, it will then look for the next tuple which satisfies condition
         }
-        slot++;
-      }return RC_RM_NO_MORE_TUPLES;
-//IMPORTANT          record->id.slot == phr->freeBitMap.array[bitmap.bits + (i * getRecordSize(scan->rel->schema))];
+        scan->slotNum++;
 
-        //record->id.slot holds the record we want, we will now see if that record
-        //satisfies the condition which is in scan->mgmtData
-
+      }
     }
-    return RC_OK;
+    free(result);
+    return RC_RM_NO_MORE_TUPLES;
 }
-    //loop through each index in the relation (stored in scan->rel)
-    //Compare each record in the table and see if it satisfies the condition:
 
-    //next should return RC_RM_NO_MORE_TUPLES once the scan is completed and RC_OK otherwise
 /*********************************************************************
 closeScan: Finishes the scan
 INPUT: Instance of ScanHandle

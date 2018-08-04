@@ -36,6 +36,8 @@ typedef struct RM_PageHeader {
 // Bookkeeping for scans
 typedef struct RM_ScanHandle {
     RM_TableData *rel;
+    unsigned int pageNum;
+    unsigned short slotNum;
     void *mgmtData;
 } RM_ScanHandle;
 
