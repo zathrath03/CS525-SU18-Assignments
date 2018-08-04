@@ -66,7 +66,6 @@ static unsigned short calcNumSlotsPerPage(unsigned short recordSize);
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
-static void setRecordSizePF(char *pfHdrFrame, unsigned short recordSize);
 static unsigned int getNumTuplesPF(char *pfHdrFrame);
 static void setNumTuplesPF(char *pfHdrFrame, unsigned int numTuples);
 static unsigned int getNextFreePage(char *pfHdrFrame);
@@ -1131,9 +1130,6 @@ static unsigned short getRecordSizePF(char *pfHdrFrame){
     unsigned short recordSize;
     memcpy(&recordSize, pfHdrFrame + recordSizeOffset, sizeof(unsigned short));
     return recordSize;
-}
-static void setRecordSizePF(char *pfHdrFrame, unsigned short recordSize){
-    memcpy(pfHdrFrame + recordSizeOffset, &recordSize, sizeof(unsigned short));
 }
 static unsigned int getNumTuplesPF(char *pfHdrFrame){
     unsigned int numTuples;
