@@ -537,19 +537,59 @@ int getRecordSize (Schema *schema){
     return recordSize;
 }
 /*********************************************************************
-createSchema allocates memory for a Schema struct and points each
-member of the struct to the parameters passed to the function
+createSchema allocates memory for a Schema struct initializes all
+variables to the parameters passed to the function
 INPUT: Initialized values for all members of the Schema struct
+    **attrNames: an array of null terminated strings
+    *typeLength: size in bytes of string type attributes, not
+        including the null terminator. Zero otherwise
 *********************************************************************/
-Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *typeLength, int keySize, int *keys){
+Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
+                      int *typeLength, int keySize, int *keys){
+    //Allocate memory for all arrays in schema struct
     VALID_CALLOC(Schema, schema, 1, sizeof(Schema));
+    VALID_CALLOC(char*, schAttrNames, numAttr, sizeof(char*));
+    VALID_CALLOC(DataType, schDataTypes, numAttr, sizeof(DataType));
+    VALID_CALLOC(int, schTypeLength, numAttr, sizeof(int));
+    VALID_CALLOC(int, schKeyAttrs, keySize, sizeof(int));
 
+
+    //initializing arrays with the parameters passed to the function
+    for(int i = 0; i < numAttr; i++){
+        //dataTypes and keys is a straight-forward copy values from input
+        schDataTypes[i] = dataTypes[i];
+        schKeyAttrs[i] = keys[i];
+        //typeLength only includes a length for the strings, 0 otherwise
+        switch (dataTypes[i]){
+        case DT_INT:
+            schTypeLength[i] = sizeof(int);
+            break;
+        case DT_FLOAT:
+            schTypeLength[i] = sizeof(float);
+            break;
+        case DT_BOOL:
+            schTypeLength[i] = sizeof(bool);
+            break;
+        default:
+            schTypeLength[i] = typeLength[i];
+            break;
+        }
+        //NOTE: typeLength does not include the null terminator for strings
+        schAttrNames[i] = (char*) calloc(1, strlen(attrNames[i]));
+        if(!schAttrNames[i]){                                   \
+            printError(RC_BM_MEMORY_ALOC_FAIL);         \
+            exit(-1);                                   \
+        }
+        strncpy(schAttrNames[i], attrNames[i], strlen(attrNames[i]));
+    }
+    //Store non-array inputs
     schema->numAttr = numAttr;
-    schema->attrNames = attrNames;
-    schema->dataTypes = dataTypes;
-    schema->typeLength = typeLength;
-    schema->keyAttrs = keys;
     schema->keySize = keySize;
+    //Store allocated arrays in schema struct
+    schema->attrNames = schAttrNames;
+    schema->dataTypes = schDataTypes;
+    schema->typeLength = schTypeLength;
+    schema->keyAttrs = schKeyAttrs;
     return schema;
 }
 /*********************************************************************
