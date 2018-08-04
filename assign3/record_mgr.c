@@ -61,7 +61,11 @@ static RC preparePFHdr(Schema *schema, char *pHandle);
 static RC deleteFromFreeLinkedList(char* pfhr,char *phr, BM_BufferPool*bm);
 static RC appendToFreeLinkedList(char * pfhr, char * phr,BM_BufferPool * bm);
 static int getAttrOffset(Schema *schema, int attrNum);
+<<<<<<< HEAD
 static RC findNewPageNum(RM_TableData * rel, unsigned int * nextFreePage);
+=======
+static unsigned short calcNumSlotsPerPage(unsigned short recordSize);
+>>>>>>> 8f55e4e454d49fc8788265191aef86df68e0137e
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
@@ -762,26 +766,21 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     //validate input
     if(!schema || !pHandle)
         return RC_RM_INIT_ERROR;
-
     //Generate Info for Header
     unsigned short recordSize = (unsigned short) getRecordSize(schema);
     unsigned int numTuples = 0;
     unsigned int nextFreePage = 0;
     //numSlotsPerPage accounts for the bitmap and next and prev pointers
-    unsigned short numSlotsPerPage = (unsigned short) ((PAGE_SIZE - 2*sizeof(int)) / (recordSize + 0.125));
-
+    unsigned short numSlotsPerPage = calcNumSlotsPerPage(recordSize);
     //Retrieve existing data from schema
     unsigned short numAttr = (unsigned short) schema->numAttr;
     unsigned short keySize = (unsigned short) schema->keySize;
-
     //Allocate memory for the schema arrays
     VALID_CALLOC(unsigned short, typeAndLength, 2*numAttr, sizeof(unsigned short));
     VALID_CALLOC(unsigned short, keyAttrs, keySize, sizeof(unsigned short));
-
     //Initialize variables to use for retrieving string data from schema
     unsigned short sizeOfAttrNames = 0;
     VALID_CALLOC(unsigned short, strLen, numAttr, sizeof(unsigned short));
-
     //Retrieve data from arrays and format how we want
     for(int i = 0; i < numAttr; i++){
         typeAndLength[2*i] = (unsigned short) schema->dataTypes[i];
@@ -789,13 +788,11 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
         strLen[i] = (unsigned short) strlen(schema->attrNames[i]);
         sizeOfAttrNames += strLen[i];
     }
-
     //Calculate the schema size from its components
     unsigned short schemaSize = (2 + 3*numAttr + keySize) * sizeof(unsigned short) + sizeOfAttrNames;
-
-    //Populating the pageHandle with the data
+    //Initialize an offset pointer for the write location
     char* curOffset = (char*) pHandle;
-
+    //Populating the pageHandle with the data
     memcpy(curOffset, &recordSize, sizeof(recordSize));
     curOffset += sizeof(recordSize);
     memcpy(curOffset, &numTuples, sizeof(numTuples));
@@ -808,29 +805,28 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     curOffset += sizeof(schemaSize);
     memcpy(curOffset, &numAttr, sizeof(numAttr));
     curOffset += sizeof(numAttr);
-
+    //Populating the pageHandle with array data
     for(int i = 0; i < 2*numAttr; i++){
         memcpy(curOffset, &typeAndLength[i], sizeof(typeAndLength[i]));
         curOffset += sizeof(typeAndLength[i]);
     }
-
+    //Populating the pageHandle with data
     memcpy(curOffset, &keySize, sizeof(keySize));
     curOffset += sizeof(keySize);
+    //Populating the pageHandle with array data
     unsigned short keyAttr;
-
     for(int i = 0; i < keySize; i++){
         keyAttr = (unsigned short)schema->keyAttrs[i];
         memcpy(curOffset, &keyAttr, sizeof(keyAttr));
         curOffset += sizeof(keyAttr);
     }
-
     for(int i = 0; i < numAttr; i++){
         memcpy(curOffset, &strLen[i], sizeof(strLen[i]));
         curOffset += sizeof(strLen[i]);
         memcpy(curOffset, &schema->attrNames[i], strLen[i]);
         curOffset += strLen[i];
     }
-
+    //Freeing memory
     free(typeAndLength);
     free(keyAttrs);
     free(strLen);
@@ -915,6 +911,31 @@ static int getAttrOffset(Schema *schema, int attrNum){
 		offset += schema->typeLength[i];
 	}
 	return offset;
+}
+/*********************************************************************
+calcNumSlotsPerPage solves the following equation iteratively
+
+PAGE_SIZE >= 4*i + floor((n+31)/32)/4 + n*r
+where i is sizeof(unsigned int) to account for ints in header
+where r is the size of a record for a given schema
+where n is the number of slots per page
+
+floor((n+31)/32) is used since the bitmap is stored in word-sized chunks
+floor((n+31)/32) is divided by 4 to convert from words to bytes
+Calculation assumes 32 bit words
+
+INPUT: recordSize: size of a record for a given schema
+*********************************************************************/
+static unsigned short calcNumSlotsPerPage(unsigned short recordSize){
+    //Calculates numSlotsPerPage assuming the number of bits in the
+        //bitmap exactly equals the numSlotsPerPage.
+        //Solves: PAGE_SIZE >= 4*i + n + n*r
+    unsigned short numSlotsPerPage = (PAGE_SIZE - 4*sizeof(unsigned int)) / (recordSize + 0.125);
+    //Rounds the number of bytes used by the bitmap up to the next word
+    unsigned short numBytesForBitmap = ((numSlotsPerPage+31)/32)/4;
+    //Recalculates numSlotsPerPage with the larger header
+    numSlotsPerPage = (PAGE_SIZE - 4*sizeof(unsigned int) - numBytesForBitmap) / recordSize;
+    return numSlotsPerPage;
 }
 /*********************************************************************
 *
