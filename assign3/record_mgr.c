@@ -59,7 +59,7 @@ int static findFreeSlot(bitmap * bitMap);
 static RC preparePFHdr(Schema *schema, char *pHandle);
 static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
 static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr, RM_PageHeader * phr,BM_BufferPool * bm);
-static int getRecordOffsetValue(Schema *schema, int attrNum);
+static int getAttrOffset(Schema *schema, int attrNum);
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
@@ -123,6 +123,7 @@ RC createTable (char *name, Schema *schema){
     if(!name || !schema)
         return RC_RM_INIT_ERROR;
     //make sure a page file with that name doesn't already exist
+//TODO: uncomment the file existence check when testing is complete
 //    if(!access(name, F_OK))
 //        return RC_RM_FILE_ALREADY_EXISTS;
     //create a page file
@@ -132,7 +133,6 @@ RC createTable (char *name, Schema *schema){
     ASSERT_RC_OK(openPageFile(name, &fHandle));
     //write page file header
     VALID_CALLOC(char, pHandle, 1, PAGE_SIZE);
-    //SM_PageHandle *pHandle = (SM_PageHandle*) calloc(1, PAGE_SIZE);
     ASSERT_RC_OK(preparePFHdr(schema, pHandle));
     ASSERT_RC_OK(writeBlock(0, &fHandle, pHandle));
     //close the page file
@@ -583,7 +583,7 @@ INPUT:
 	**value: the pointer where the retrieved attribute value is stored
 *********************************************************************/
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
-	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
+	char *attr_offset = record->data + getAttrOffset(schema, attrNum);
 
 	//Value *attr_val = (Value *) malloc(sizeof(Value));
 	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
@@ -627,7 +627,7 @@ INPUT:
 	*value: pointer to the new value the record is to be updated with
 *********************************************************************/
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
-	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
+	char *attr_offset = record->data + getAttrOffset(schema, attrNum);
 
 	switch(schema->dataTypes[attrNum]) {
 		case DT_INT:{
@@ -727,7 +727,7 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     unsigned int numTuples = 0;
     unsigned int nextFreePage = 0;
     //numSlotsPerPage accounts for the bitmap and next and prev pointers
-    unsigned short numSlotsPerPage = (unsigned short) (PAGE_SIZE - 2*sizeof(int)) / (recordSize + 0.125));
+    unsigned short numSlotsPerPage = (unsigned short) ((PAGE_SIZE - 2*sizeof(int)) / (recordSize + 0.125));
 
     //Retrieve existing data from schema
     unsigned short numAttr = (unsigned short) schema->numAttr;
@@ -871,7 +871,7 @@ INPUT:
 	*schema: initialized schema - used for locating the attribute in record
 	attrNum: The index of the attribute in the record
 *********************************************************************/
-static int getRecordOffsetValue(Schema *schema, int attrNum){
+static int getAttrOffset(Schema *schema, int attrNum){
 	int offset = 0;
 	for(int i = 0; i < attrNum; i++) {
 		offset += schema->typeLength[i];
