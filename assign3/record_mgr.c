@@ -295,7 +295,8 @@ RC insertRecord (RM_TableData *rel, Record *record){
         bitmap_deallocate(b);
     }
     //find free slot using pageHeader bitMap
-    unsigned short nextFreeSlot = findFreeSlot(getBitMapPH(pageToInsert.data));
+    bitmap * b = getBitMapPH(pageToInsert.data);
+    unsigned short nextFreeSlot = findFreeSlot(b);
     if(nextFreeSlot==getNumSlotsPerPage(pageFileHeader.data))
         return RC_RM_NO_FREE_PAGES;
     //update record->id.slot
@@ -303,25 +304,26 @@ RC insertRecord (RM_TableData *rel, Record *record){
     //read location of next free slot from current slot
     int recordSize = getRecordSizePF(pageFileHeader.data);
     //maybe put this into a macro
-    char * slotPtr = pageToInsert.data
-    + 2*pageNumOffset + 2* sizeof(int)
-    + bitmapOffset(getBitMapWordsPH(pageToInsert.data)) // add the bitMap size offset
-    + (nextFreeSlot * recordSize );
+    char * slotPtr = pageToInsert.data;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(pageToInsert.data)); // add the bitMap size offset
+    slotPtr+= (nextFreeSlot * recordSize );
     //write record->data to current slot
     //maybe we don't need to do recordSize +1 because we don't want the null char
     //at the end of the record data array
     memcpy(slotPtr, record->data,recordSize);
     //update the bitMap
-    bitmap * b = getBitMapPH(pageToInsert.data);
     bitmap_set(b, nextFreeSlot);
     setBitMapArrayPH(pageToInsert.data, b);
-    bitmap_deallocate(b);
+
     //check if the page doesn't have anymore slots
     //so the page will be removed from the linked list
-    if(findFreeSlot(getBitMapPH(pageToInsert.data))==getNumSlotsPerPage(pageFileHeader.data))
+    if(findFreeSlot(b)==getNumSlotsPerPage(pageFileHeader.data))
     {
         ASSERT_RC_OK(deleteFromFreeLinkedList(pageFileHeader.data,pageToInsert.data,bm));
     }
+    //free bitmap
+    bitmap_deallocate(b);
     //increment numTuples in the pageFile header
     setNumTuplesPF(pageFileHeader.data, getNumTuplesPF(pageToInsert.data)+1);
     //mark pages as dirty
@@ -335,15 +337,7 @@ RC insertRecord (RM_TableData *rel, Record *record){
     return RC_OK;
 }
 
-static RC findNewPageNum(RM_TableData * rel, unsigned int * nextFreePage)
-{
-    RC returnCode = RC_INIT;
-    SM_FileHandle fHandle;
-    ASSERT_RC_OK(openPageFile(rel->name,&fHandle));
-    *nextFreePage = fHandle.totalNumPages+1;
-    ASSERT_RC_OK(closePageFile(&fHandle));
-    return RC_OK;
-}
+
 
 /*********************************************************************
 deleteRecord deletes the record identified by id from *rel
@@ -363,34 +357,38 @@ RC deleteRecord (RM_TableData *rel, RID id){
     BM_BufferPool* bm = rel->bufferPool;
     //pin the page with the pageFile header
     ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
-    RM_PageFileHeader* pfhr = (RM_PageFileHeader *) &pageFileHeader.data;
+    char* pfhr = pageFileHeader.data;
     ASSERT_RC_OK(pinPage(bm,&pageToDelete,pageNum));
     //find free slot using pageHeader bitMap
-    RM_PageHeader * phr = (RM_PageHeader *) &pageToDelete.data;
+    char * phr = pageToDelete.data;
     int recordSize = getRecordSizePF(pageFileHeader.data);
     //delete the record at id.slot
         //(offset by slot*recordSize+sizeof(short))
-    char * slotPtr = (char*) &pageToDelete+sizeof(RM_PageHeader)
-    + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
-    + (slotNum * recordSize );
+    char * slotPtr = phr;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+    slotPtr+= (slotNum * recordSize );
 
     //**if the page didn't previously have a free slot, check
     //to see if it is now the first page with a free slot
     //and update pageFile header appropriately
-    if(findFreeSlot(phr->freeBitMap)==phr->freeBitMap->bits)
+    bitmap * b = getBitMapPH(phr);
+    if(findFreeSlot(b)==getNumSlotsPerPage(pageFileHeader.data))
     {
         //save the current pageNum into the prev ptr
-        phr->prevFreePage = pageNum;
-        ASSERT_RC_OK(appendToFreeLinkedList(pageFileHeader.data,pageToDelete.data,bm));
+        setPrevFreePagePH(phr,0);
+        ASSERT_RC_OK(appendToFreeLinkedList(pfhr,phr,bm));
     }
     //update bitMap
-    bitmap_clear(phr->freeBitMap, slotNum);
+    bitmap_clear(b, slotNum);
+    setBitMapPH(phr, b);
+    bitmap_deallocate(b);
     //Not sure if this is truly necessary
     //if we update the bitMap then we won't read from that slot anymore
     //this is just for safety and can be taken out
     memset(slotPtr, 0,recordSize);
     //decrement numTuples
-    pfhr->numTuples--;
+    setNumTuplesPF(pfhr,getNumTuplesPF(pfhr)-1);
     //mark pages as dirty
     ASSERT_RC_OK(markDirty(bm, &pageFileHeader));
     ASSERT_RC_OK(markDirty(bm, &pageToDelete));
@@ -423,13 +421,14 @@ RC updateRecord (RM_TableData *rel, Record *record){
     BM_BufferPool* bm = rel->bufferPool;
     //pin the first page with a free slot
     ASSERT_RC_OK(pinPage(bm,&pageToUpdate,pageNum));
-    RM_PageHeader * phr = (RM_PageHeader *) &pageToUpdate.data;
+    char * phr = pageToUpdate.data;
     //read location of next free slot from current slot
     int recordSize = getRecordSize(rel->schema);
     //maybe put this into a macro
-    char * slotPtr = (char*) &pageToUpdate+sizeof(RM_PageHeader)
-    + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
-    + (slotNum * recordSize );
+    char * slotPtr = phr;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+    slotPtr+= (slotNum * recordSize );
     //write record->data to current slot
     //maybe we don't need to do recordSize +1 because we don't want the null char
     //at the end of the record data array
@@ -466,13 +465,14 @@ RC getRecord (RM_TableData *rel, RID id, Record *record){
     //pin the page of interest
     ASSERT_RC_OK(pinPage(bm,&pageToGet,pageNum));
     //find free slot using pageHeader bitMap
-    RM_PageHeader * phr = (RM_PageHeader *) &pageToGet.data;
+    char * phr = pageToGet.data;
     //read location of next free slot from current slot
     int recordSize = getRecordSize(rel->schema);
     //maybe put this into a macro
-    char * slotPtr = (char*) &pageToGet+sizeof(RM_PageHeader)
-    + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
-    + (slotNum * recordSize );
+    char * slotPtr = phr;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+    slotPtr+= (slotNum * recordSize );
     //write record->data to current slot
     //maybe we don't need to do recordSize +1 because we don't want the null char
     //at the end of the record data array
@@ -717,7 +717,18 @@ int static findFreeSlot(bitmap * bitMap){
     }
     return mapSize;
 }
-
+/********************************************************************
+find the page number for the next page to be allocated upon creation
+********************************************************************/
+static RC findNewPageNum(RM_TableData * rel, unsigned int * nextFreePage)
+{
+    RC returnCode = RC_INIT;
+    SM_FileHandle fHandle;
+    ASSERT_RC_OK(openPageFile(rel->name,&fHandle));
+    *nextFreePage = fHandle.totalNumPages;
+    ASSERT_RC_OK(closePageFile(&fHandle));
+    return RC_OK;
+}
 /*********************************************************************
 preparePFHdr populates a PageHandle with the data for the PageFile Hdr
 Assumes initial generation of pageFile, so no tuples have been added
@@ -829,6 +840,7 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     free(strLen);
     return RC_OK;
 }
+
 
 static RC appendToFreeLinkedList(char * pfhr,
                                  char * phr,
@@ -963,15 +975,15 @@ static bitmap* getBitMapPH(char * phrFrame){
     VALID_CALLOC(bitmap, b,1,sizeof(bitmap));
     char * curOff = phrFrame + 2 * pageNumOffset;
     //set number of bits
-    memcpy((char*)b->bits,curOff, sizeof(int));
+    memcpy(&b->bits,curOff, sizeof(int));
     curOff+=sizeof(int);
     //set number of words
-    memcpy((char*)b->words,curOff, sizeof(int));
+    memcpy(&b->words,curOff, sizeof(int));
     curOff +=sizeof(int);
     //set bit Array
     VALID_CALLOC(bitmap_type *, bitArray, b->words,sizeof(bitmap_type));
     memcpy(bitArray,curOff, sizeof(bitmap_type)* b->words);
-    b->array = bitArray;
+    b->array =(bitmap_type*) bitArray;
     return b;
 }
 
@@ -991,10 +1003,10 @@ static void setBitMapPH(char * phrFrame, bitmap* b){
     char * curOff = phrFrame + 2 * pageNumOffset;
 
     //set number of bits
-    memcpy(curOff,b->bits, sizeof(int));
+    memcpy(curOff,&b->bits, sizeof(int));
     curOff+=sizeof(int);
     //set number of words
-    memcpy(curOff,b->words, sizeof(int));
+    memcpy(curOff,&b->words, sizeof(int));
     curOff +=sizeof(int);
     //set bit Array
     memcpy(curOff, b->array, sizeof(bitmap_type)* b->words);
