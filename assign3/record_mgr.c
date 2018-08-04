@@ -491,7 +491,11 @@ RC getRecord (RM_TableData *rel, RID id, Record *record){
 *                        SCAN FUNCTIONS
 *
 *********************************************************************/
-//initializes the RM_ScanHandle data structure passed as an argument to startScan.
+/*********************************************************************
+startScan: Initializes the RM_ScanHandle data structure
+INPUT: initialized relation, instance of ScanHandle, and the condition
+RETURNS: RC_OK
+*********************************************************************/
 RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond){
     //Validation of inputs
     if(!rel || !scan || !cond)  //If input is invalid then return error code
@@ -499,22 +503,83 @@ RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond){
 
     scan->mgmtData = cond;  //Store the condition into the mgmtData field
     scan->rel = rel;        //Store the relation into the rel field
+    scan->slotNum = 0;
+    scan->pageNum = 1;
     return RC_OK;
 }
-//next method should return the next tuple that fulfills the scan condition
-//If NULL is passed as a scan condition, then all tuples of the table should be returned
+
+/*********************************************************************
+next: Looks for the next tuple that fulfills the scan condition and
+returns it.
+INPUT: Instance of ScanHandle (if NULL is passed, then all tuples of
+       the table should be returned), a Record
+Return: RC_RM_NO_MORE_TUPLES once scan is completed
+        RC_OK otherwise
+*********************************************************************/
 RC next (RM_ScanHandle *scan, Record *record){
+    RC returnCode = RC_INIT;
+    SM_FileHandle fHandle;
+    BM_PageHandle pageFileHeader;
+    BM_PageHandle curPage;//used to pin page to BufferPool
+    BM_BufferPool* bm = scan->rel->bufferPool;
     //Validation of inputs
-    if(!scan || !record)    //If input is invalid then return error code
+    if(!record)    //If input is invalid then return error code
       return RC_RM_INIT_ERROR;
 
-//    if()
+    // open the page file
+    ASSERT_RC_OK(openPageFile(scan->rel->name, &fHandle));
+    //store number of pages in the fHandle into numPages
+    int numPages = fHandle.totalNumPages;
+    ASSERT_RC_OK(closePageFile(&fHandle));
+    //pin the pageFile header to bufferpool
+    //Only need to do once
+    ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
+    char* pfhr = pageFileHeader.data;
+    VALID_CALLOC(Value, result, 1, sizeof(Value)); //Allocate mem for result in evalExpr
+    //Iterate through the pages on disk and pin to bufferpool and search over bitmap of that page
+    int recordSize = getRecordSize(scan->rel->schema);
+    for(; scan->pageNum<numPages; scan->pageNum++){
+      ASSERT_RC_OK(pinPage(bm,&curPage,scan->pageNum));
+      char * phr = curPage.data;//used to find used slot
+      //point to bitmap in the current page
+      //TODO: have address of bitmap be pointed by a variable (lets call it bitmap just for use in while loop)
+      bitmap * b = getBitMapPH(phr);
+      //while we did not reach the end of the slot
+      while(scan->slotNum <= getNumSlotsPerPage(pfhr)){
+        //utilize bitmap_read(bitmap, int n) to retrieve bit
+        //if bit = 1, then store the data (record) at that position in the page into record->id.slot
+        if(bitmap_read(b,scan->slotNum)==1)
+        {
+          char * slotPtr = phr;
+          slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+          slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+          slotPtr+= (scan->slotNum * recordSize );
+          ASSERT_RC_OK(evalExpr(record, scan->rel->schema, scan->mgmtData, &result));
+          if(result->v.boolV || scan->mgmtData == NULL){
+            //if the condition matches, then update the scanHandle so that now has the tuple in it
+            memcpy(record->data, slotPtr, getRecordSize(scan->rel->schema));
+            record->id.page = scan->pageNum;
+            record->id.slot = scan->slotNum;
+            free(result);
+            return RC_OK;
+          }
+        }
+        scan->slotNum++;
 
-    return RC_OK;
-    //next should return RC_RM_NO_MORE_TUPLES once the scan is completed and RC_OK otherwise
+      }
+    }
+    free(result);
+    return RC_RM_NO_MORE_TUPLES;
 }
-//Return RC_OK
+
+/*********************************************************************
+closeScan: Finishes the scan
+INPUT: Instance of ScanHandle
+RETURNS: RC_OK
+*********************************************************************/
 RC closeScan (RM_ScanHandle *scan){
+    /*free(scan->mgmtData);
+    scan->mgmtData = NULL;*/
     return RC_OK;
 }
 
