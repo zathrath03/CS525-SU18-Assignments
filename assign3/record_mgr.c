@@ -725,9 +725,9 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     //Generate Info for Header
     unsigned short recordSize = (unsigned short) getRecordSize(schema);
     unsigned int numTuples = 0;
-    unsigned int nextFreePage = 1;
+    unsigned int nextFreePage = 0;
     //numSlotsPerPage accounts for the bitmap and next and prev pointers
-    unsigned short numSlotsPerPage = (unsigned short) (PAGE_SIZE / ((recordSize + 0.125) + 2*sizeof(int)));
+    unsigned short numSlotsPerPage = (unsigned short) (PAGE_SIZE - 2*sizeof(int)) / (recordSize + 0.125));
 
     //Retrieve existing data from schema
     unsigned short numAttr = (unsigned short) schema->numAttr;
