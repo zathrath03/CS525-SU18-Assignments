@@ -27,8 +27,8 @@ typedef struct RM_PageFileHeader {
 } RM_PageFileHeader;
 
 typedef struct RM_PageHeader {
-    int prevFreePage;
-    int nextFreePage;
+    unsigned int prevFreePage;
+    unsigned int nextFreePage;
     bitmap* freeBitMap;
 } RM_PageHeader;
 

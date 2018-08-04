@@ -21,9 +21,9 @@
     }
 
 /**Must declare RC returnCode in function before using ASSERT_RC_OK**/
-#define ASSERT_RC_OK(functionCall)          \
-    returnCode = functionCall;                 \
-    if(returnCode != RC_OK )\
+#define ASSERT_RC_OK(functionCall)  \
+    returnCode = functionCall;      \
+    if(returnCode != RC_OK )        \
        return returnCode;
 
 /*********************************************************************
@@ -31,8 +31,9 @@ Offset Macros for retrieving data from the PageFile header
 *********************************************************************/
 #define recordSizeOffset 0
 #define numTuplesOffset sizeof(unsigned short)
+#define pageNumOffset sizeof(unsigned int)
 #define nextFreePageOffset numTuplesOffset + sizeof(unsigned int)
-#define numSlotsPerPageOffset nextFreePageOffset + sizeof(unsigned int)
+#define numSlotsPerPageOffset nextFreePageOffset + pageNumOffset
 #define schemaSizeOffset numSlotsPerPageOffset + sizeof(unsigned short)
 #define schemaOffset schemaSizeOffset + sizeof(unsigned short)
 #define numAttrOffset schemaOffset
@@ -49,8 +50,6 @@ Offset Macros for retrieving data from the Page header
 *********************************************************************/
 #define bitmapOffset(i) i*sizeof(bitmap_type) //i is the bitmap->words
 
-
-
 /*********************************************************************
 *
 *                       FUNCTION PROTOTYPES
@@ -58,10 +57,12 @@ Offset Macros for retrieving data from the Page header
 *********************************************************************/
 // Prototypes for helper functions
 int static findFreeSlot(bitmap * bitMap);
-static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle);
-static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,RM_PageHeader *phr, BM_BufferPool*bm);
-static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr, RM_PageHeader * phr,BM_BufferPool * bm);
-static int getRecordOffsetValue(Schema *schema, int attrNum);
+static RC preparePFHdr(Schema *schema, char *pHandle);
+static RC deleteFromFreeLinkedList(char* pfhr,char *phr, BM_BufferPool*bm);
+static RC appendToFreeLinkedList(char * pfhr, char * phr,BM_BufferPool * bm);
+static int getAttrOffset(Schema *schema, int attrNum);
+static RC findNewPageNum(RM_TableData * rel, unsigned int * nextFreePage);
+static unsigned short calcNumSlotsPerPage(unsigned short recordSize);
 
 // Prototypes for getters and setters for pagefile header data
 static unsigned short getRecordSizePF(char *pfHdrFrame);
@@ -81,10 +82,20 @@ static unsigned short getIthKeyAttr(char *pfHdrFrame, int ithSlot);
 static unsigned short getIthNameLength(char *pfHdrFrame, int ithSlot);
 static char* getIthAttrName(char *pfHdrFrame, int ithSlot);
 
+//prototypes for getters and setters for page header
+static bitmap* getBitMapPH(char * phrFrame);
+static int getBitMapWordsPH(char* phrFrame);
+static int getBitMapBitsPH(char* phrFrame);
+static void setBitMapPH(char * phrFrame, bitmap* b);
+static void setBitMapArrayPH(char* phrFrame, bitmap * b);
+static unsigned int getPrevFreePagePH(char *phrFrame);
+static unsigned int getNextFreePagePH(char *phrFrame);
+static void setPrevFreePagePH(char * phrFrame, unsigned int pageNum);
+static void setNextFreePagePH(char * phrFrame, unsigned int pageNum);
+
 /*********************************************************************
 * Notes:
 * This implementation of the bitMap and double linked list
-* isn't circular.
 * - The next of the tail points to NO_PAGE.
 * - The previous of the head points to N0_PAGE as well
 * appending is to the head, deleting could be anywhere
@@ -125,18 +136,18 @@ RC createTable (char *name, Schema *schema){
     if(!name || !schema)
         return RC_RM_INIT_ERROR;
     //make sure a page file with that name doesn't already exist
-    if(!access(name, F_OK))
-        return RC_RM_FILE_ALREADY_EXISTS;
+//TODO: uncomment the file existence check when testing is complete
+//    if(!access(name, F_OK))
+//        return RC_RM_FILE_ALREADY_EXISTS;
     //create a page file
     ASSERT_RC_OK(createPageFile(name));
     //open the page file
     SM_FileHandle fHandle;
     ASSERT_RC_OK(openPageFile(name, &fHandle));
     //write page file header
-    VALID_CALLOC(SM_PageHandle, pHandle, 1, PAGE_SIZE);
-    //SM_PageHandle *pHandle = (SM_PageHandle*) calloc(1, PAGE_SIZE);
+    VALID_CALLOC(char, pHandle, 1, PAGE_SIZE);
     ASSERT_RC_OK(preparePFHdr(schema, pHandle));
-    ASSERT_RC_OK(writeBlock(0, &fHandle, *pHandle));
+    ASSERT_RC_OK(writeBlock(0, &fHandle, pHandle));
     //close the page file
     ASSERT_RC_OK(closePageFile(&fHandle));
     //free allocated memory
@@ -161,7 +172,7 @@ RC openTable (RM_TableData *rel, char *name){
     ASSERT_RC_OK(openPageFile(name, &fHandle));
     // initialize a buffer pool
     VALID_CALLOC(BM_BufferPool, bm, 1, sizeof(BM_BufferPool));
-    ASSERT_RC_OK(initBufferPool(bm, name, 100000, RS_LRU, NULL));
+    ASSERT_RC_OK(initBufferPool(bm, name, 1000, RS_LRU, NULL));
     // pin page with pageFile header
     BM_PageHandle pfHdr;
     ASSERT_RC_OK(pinPage(bm, &pfHdr, 0));
@@ -248,6 +259,8 @@ INPUT:
 *********************************************************************/
 RC insertRecord (RM_TableData *rel, Record *record){
     RC returnCode = RC_INIT;
+    bool newPageCreated = false;
+
     //validate input
     if(!rel)
         return RC_RM_INIT_ERROR;
@@ -259,42 +272,60 @@ RC insertRecord (RM_TableData *rel, Record *record){
     BM_BufferPool* bm = rel->bufferPool;
     //pin the page with the pageFile header
     ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
-    RM_PageFileHeader* pfhr = (RM_PageFileHeader *) &pageFileHeader.data;
     //find the first page with free slot from pageFile header
-    int freePageNum = pfhr->nextFreePage;
-    if(freePageNum==NO_PAGE)
-        return RC_RM_NO_FREE_PAGES;
+    unsigned int freePageNum = getNextFreePage(pageFileHeader.data);
+    if(freePageNum==0)
+    {
+        ASSERT_RC_OK(findNewPageNum(rel, &freePageNum));
+        newPageCreated=true;
+    }
     //update record->id.page
     record->id.page = freePageNum;
     //pin the first page with a free slot
     ASSERT_RC_OK(pinPage(bm,&pageToInsert,freePageNum));
+    //setup page header if it is a new page
+    if(newPageCreated)
+    {
+        //set up pages
+        setNextFreePagePH(pageToInsert.data, 0);
+        setPrevFreePagePH(pageToInsert.data, 0);
+        appendToFreeLinkedList(pageFileHeader.data, pageToInsert.data, bm);
+        bitmap * b = bitmap_allocate((int) getNumSlotsPerPage(pageFileHeader.data));
+        setBitMapPH(pageToInsert.data, b);
+        bitmap_deallocate(b);
+    }
     //find free slot using pageHeader bitMap
-    RM_PageHeader * phr = (RM_PageHeader *) &pageToInsert.data;
-    int nextFreeSlot = findFreeSlot(phr->freeBitMap);
-    if(nextFreeSlot==phr->freeBitMap->bits)
+    bitmap * b = getBitMapPH(pageToInsert.data);
+    unsigned short nextFreeSlot = findFreeSlot(b);
+    if(nextFreeSlot==getNumSlotsPerPage(pageFileHeader.data))
         return RC_RM_NO_FREE_PAGES;
     //update record->id.slot
     record->id.slot = nextFreeSlot;
     //read location of next free slot from current slot
     int recordSize = getRecordSizePF(pageFileHeader.data);
     //maybe put this into a macro
-    char * slotPtr = (char*) &pageToInsert+sizeof(RM_PageHeader)
-    + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
-    + (nextFreeSlot * recordSize );
+    char * slotPtr = pageToInsert.data;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(pageToInsert.data)); // add the bitMap size offset
+    slotPtr+= (nextFreeSlot * recordSize );
     //write record->data to current slot
     //maybe we don't need to do recordSize +1 because we don't want the null char
     //at the end of the record data array
     memcpy(slotPtr, record->data,recordSize);
     //update the bitMap
-    bitmap_set(phr->freeBitMap, nextFreeSlot);
+    bitmap_set(b, nextFreeSlot);
+    setBitMapArrayPH(pageToInsert.data, b);
+
     //check if the page doesn't have anymore slots
     //so the page will be removed from the linked list
-    if(findFreeSlot(phr->freeBitMap)==phr->freeBitMap->bits)
+    if(findFreeSlot(b)==getNumSlotsPerPage(pageFileHeader.data))
     {
-        ASSERT_RC_OK(deleteFromFreeLinkedList(pfhr,phr,bm));
+        ASSERT_RC_OK(deleteFromFreeLinkedList(pageFileHeader.data,pageToInsert.data,bm));
     }
+    //free bitmap
+    bitmap_deallocate(b);
     //increment numTuples in the pageFile header
-    pfhr->numTuples++;
+    setNumTuplesPF(pageFileHeader.data, getNumTuplesPF(pageToInsert.data)+1);
     //mark pages as dirty
     ASSERT_RC_OK(markDirty(bm, &pageFileHeader));
     ASSERT_RC_OK(markDirty(bm, &pageToInsert));
@@ -305,6 +336,9 @@ RC insertRecord (RM_TableData *rel, Record *record){
         //that will be handled by page replacement
     return RC_OK;
 }
+
+
+
 /*********************************************************************
 deleteRecord deletes the record identified by id from *rel
 INPUT:
@@ -323,34 +357,38 @@ RC deleteRecord (RM_TableData *rel, RID id){
     BM_BufferPool* bm = rel->bufferPool;
     //pin the page with the pageFile header
     ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
-    RM_PageFileHeader* pfhr = (RM_PageFileHeader *) &pageFileHeader.data;
+    char* pfhr = pageFileHeader.data;
     ASSERT_RC_OK(pinPage(bm,&pageToDelete,pageNum));
     //find free slot using pageHeader bitMap
-    RM_PageHeader * phr = (RM_PageHeader *) &pageToDelete.data;
+    char * phr = pageToDelete.data;
     int recordSize = getRecordSizePF(pageFileHeader.data);
     //delete the record at id.slot
         //(offset by slot*recordSize+sizeof(short))
-    char * slotPtr = (char*) &pageToDelete+sizeof(RM_PageHeader)
-    + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
-    + (slotNum * recordSize );
+    char * slotPtr = phr;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+    slotPtr+= (slotNum * recordSize );
 
     //**if the page didn't previously have a free slot, check
     //to see if it is now the first page with a free slot
     //and update pageFile header appropriately
-    if(findFreeSlot(phr->freeBitMap)==phr->freeBitMap->bits)
+    bitmap * b = getBitMapPH(phr);
+    if(findFreeSlot(b)==getNumSlotsPerPage(pageFileHeader.data))
     {
         //save the current pageNum into the prev ptr
-        phr->prevFreePage = pageNum;
+        setPrevFreePagePH(phr,0);
         ASSERT_RC_OK(appendToFreeLinkedList(pfhr,phr,bm));
     }
     //update bitMap
-    bitmap_clear(phr->freeBitMap, slotNum);
+    bitmap_clear(b, slotNum);
+    setBitMapPH(phr, b);
+    bitmap_deallocate(b);
     //Not sure if this is truly necessary
     //if we update the bitMap then we won't read from that slot anymore
     //this is just for safety and can be taken out
     memset(slotPtr, 0,recordSize);
     //decrement numTuples
-    pfhr->numTuples--;
+    setNumTuplesPF(pfhr,getNumTuplesPF(pfhr)-1);
     //mark pages as dirty
     ASSERT_RC_OK(markDirty(bm, &pageFileHeader));
     ASSERT_RC_OK(markDirty(bm, &pageToDelete));
@@ -383,13 +421,14 @@ RC updateRecord (RM_TableData *rel, Record *record){
     BM_BufferPool* bm = rel->bufferPool;
     //pin the first page with a free slot
     ASSERT_RC_OK(pinPage(bm,&pageToUpdate,pageNum));
-    RM_PageHeader * phr = (RM_PageHeader *) &pageToUpdate.data;
+    char * phr = pageToUpdate.data;
     //read location of next free slot from current slot
     int recordSize = getRecordSize(rel->schema);
     //maybe put this into a macro
-    char * slotPtr = (char*) &pageToUpdate+sizeof(RM_PageHeader)
-    + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
-    + (slotNum * recordSize );
+    char * slotPtr = phr;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+    slotPtr+= (slotNum * recordSize );
     //write record->data to current slot
     //maybe we don't need to do recordSize +1 because we don't want the null char
     //at the end of the record data array
@@ -426,13 +465,14 @@ RC getRecord (RM_TableData *rel, RID id, Record *record){
     //pin the page of interest
     ASSERT_RC_OK(pinPage(bm,&pageToGet,pageNum));
     //find free slot using pageHeader bitMap
-    RM_PageHeader * phr = (RM_PageHeader *) &pageToGet.data;
+    char * phr = pageToGet.data;
     //read location of next free slot from current slot
     int recordSize = getRecordSize(rel->schema);
     //maybe put this into a macro
-    char * slotPtr = (char*) &pageToGet+sizeof(RM_PageHeader)
-    + bitmapOffset(phr->freeBitMap->words) // add the bitMap size offset
-    + (slotNum * recordSize );
+    char * slotPtr = phr;
+    slotPtr+= 2*pageNumOffset + 2* sizeof(int);
+    slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
+    slotPtr+= (slotNum * recordSize );
     //write record->data to current slot
     //maybe we don't need to do recordSize +1 because we don't want the null char
     //at the end of the record data array
@@ -616,7 +656,16 @@ RC freeSchema (Schema *schema){
 *                        ATTRIBUTE FUNCTIONS
 *
 *********************************************************************/
-//Create a record for the schema passed in
+/*********************************************************************
+Allocates memory for a Record struct along with the the memory for
+a table record which is equivalent to the sum of the size of all the
+attributes specified in the schema.
+If address of record or schema does not exist, return INIT error
+INPUT:
+	**record: pointer to a pointer of the newly allocated memory
+			  for Record
+	*schema: pointer to pre initialized schema
+*********************************************************************/
 RC createRecord (Record **record, Schema *schema){
     //Validate passed input
     if(!record || !schema)
@@ -630,6 +679,12 @@ RC createRecord (Record **record, Schema *schema){
     return RC_OK;
 }
 
+/*********************************************************************
+Frees all memory associated with Record struct along with the
+the memory for the struct
+INPUT:
+	*record: pointer of the populated record struct
+*********************************************************************/
 RC freeRecord (Record *record){
 	free(record->data);
 	//record->id = NULL;
@@ -638,8 +693,17 @@ RC freeRecord (Record *record){
     return RC_OK;
 }
 
+/*********************************************************************
+Gets the value of an attribute(specified by 'attrNum') from the
+record and stores in *value
+INPUT:
+	*record: initialized record to retrieve the attribute from from
+	*schema: initialized schema - used for locating the attribute in record
+	attrNum: The index of the attribute in the record
+	**value: the pointer where the retrieved attribute value is stored
+*********************************************************************/
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
-	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
+	char *attr_offset = record->data + getAttrOffset(schema, attrNum);
 
 	//Value *attr_val = (Value *) malloc(sizeof(Value));
 	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
@@ -673,28 +737,35 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
     return RC_OK;
 }
 
+/*********************************************************************
+Sets the value of an attribute(specified by 'attrNum') from the
+*value to the *record
+INPUT:
+	*record: initialized record where value is to be updated
+	*schema: initialized schema - used for locating the attribute in record
+	attrNum: The index of the attribute in the record to be updated
+	*value: pointer to the new value the record is to be updated with
+*********************************************************************/
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
-	char *attr_offset = record->data + getRecordOffsetValue(schema, attrNum);
-
-	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
+	char *attr_offset = record->data + getAttrOffset(schema, attrNum);
 
 	switch(schema->dataTypes[attrNum]) {
 		case DT_INT:{
-			memcpy(attr_offset, &(attr_val->v.intV), schema->typeLength[attrNum]);
+			memcpy(attr_offset, &(value->v.intV), schema->typeLength[attrNum]);
 			//*(int *)attr_offset = attr_val->v.intV;
 			break;
 		}
 		case DT_STRING: {
-			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
+			memcpy(attr_offset, value->v.stringV, schema->typeLength[attrNum]);
 			break;
 		}
 		case DT_FLOAT: {
-			memcpy(attr_offset, &(attr_val->v.floatV), schema->typeLength[attrNum]);
+			memcpy(attr_offset, &(value->v.floatV), schema->typeLength[attrNum]);
 			//*(float *)attr_offset = attr_val->v.floatV;
 			break;
 		}
 		case DT_BOOL: {
-			memcpy(attr_offset, &(attr_val->v.boolV), schema->typeLength[attrNum]);
+			memcpy(attr_offset, &(value->v.boolV), schema->typeLength[attrNum]);
 			//*(bool *)attr_offset = attr_val->v.boolV;
 			break;
 		}
@@ -724,7 +795,18 @@ int static findFreeSlot(bitmap * bitMap){
     }
     return mapSize;
 }
-
+/********************************************************************
+find the page number for the next page to be allocated upon creation
+********************************************************************/
+static RC findNewPageNum(RM_TableData * rel, unsigned int * nextFreePage)
+{
+    RC returnCode = RC_INIT;
+    SM_FileHandle fHandle;
+    ASSERT_RC_OK(openPageFile(rel->name,&fHandle));
+    *nextFreePage = fHandle.totalNumPages;
+    ASSERT_RC_OK(closePageFile(&fHandle));
+    return RC_OK;
+}
 /*********************************************************************
 preparePFHdr populates a PageHandle with the data for the PageFile Hdr
 Assumes initial generation of pageFile, so no tuples have been added
@@ -766,29 +848,25 @@ SCHEMA OFFSETS FROM START OF SCHEMA
     Offset to a specific attribute's name will need to be calculated
         using the strlen's
 *********************************************************************/
-static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
+static RC preparePFHdr(Schema *schema, char *pHandle){
     //validate input
     if(!schema || !pHandle)
         return RC_RM_INIT_ERROR;
-
     //Generate Info for Header
     unsigned short recordSize = (unsigned short) getRecordSize(schema);
     unsigned int numTuples = 0;
-    unsigned int nextFreePage = 1;
-    unsigned short numSlotsPerPage = (unsigned short) (PAGE_SIZE / recordSize);
-
+    unsigned int nextFreePage = 0;
+    //numSlotsPerPage accounts for the bitmap and next and prev pointers
+    unsigned short numSlotsPerPage = calcNumSlotsPerPage(recordSize);
     //Retrieve existing data from schema
     unsigned short numAttr = (unsigned short) schema->numAttr;
     unsigned short keySize = (unsigned short) schema->keySize;
-
     //Allocate memory for the schema arrays
     VALID_CALLOC(unsigned short, typeAndLength, 2*numAttr, sizeof(unsigned short));
     VALID_CALLOC(unsigned short, keyAttrs, keySize, sizeof(unsigned short));
-
     //Initialize variables to use for retrieving string data from schema
     unsigned short sizeOfAttrNames = 0;
     VALID_CALLOC(unsigned short, strLen, numAttr, sizeof(unsigned short));
-
     //Retrieve data from arrays and format how we want
     for(int i = 0; i < numAttr; i++){
         typeAndLength[2*i] = (unsigned short) schema->dataTypes[i];
@@ -796,13 +874,11 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
         strLen[i] = (unsigned short) strlen(schema->attrNames[i]);
         sizeOfAttrNames += strLen[i];
     }
-
     //Calculate the schema size from its components
     unsigned short schemaSize = (2 + 3*numAttr + keySize) * sizeof(unsigned short) + sizeOfAttrNames;
-
-    //Populating the pageHandle with the data
+    //Initialize an offset pointer for the write location
     char* curOffset = (char*) pHandle;
-
+    //Populating the pageHandle with the data
     memcpy(curOffset, &recordSize, sizeof(recordSize));
     curOffset += sizeof(recordSize);
     memcpy(curOffset, &numTuples, sizeof(numTuples));
@@ -815,37 +891,37 @@ static RC preparePFHdr(Schema *schema, SM_PageHandle *pHandle){
     curOffset += sizeof(schemaSize);
     memcpy(curOffset, &numAttr, sizeof(numAttr));
     curOffset += sizeof(numAttr);
-
+    //Populating the pageHandle with array data
     for(int i = 0; i < 2*numAttr; i++){
         memcpy(curOffset, &typeAndLength[i], sizeof(typeAndLength[i]));
         curOffset += sizeof(typeAndLength[i]);
     }
-
+    //Populating the pageHandle with data
     memcpy(curOffset, &keySize, sizeof(keySize));
     curOffset += sizeof(keySize);
-    unsigned short temp;
-
-    for(int i = 0; i<keySize; i++){
-        temp = (unsigned short)schema->keyAttrs[i];
-        memcpy(curOffset, &temp, sizeof(temp));
-        curOffset += sizeof(temp);
+    //Populating the pageHandle with array data
+    unsigned short keyAttr;
+    for(int i = 0; i < keySize; i++){
+        keyAttr = (unsigned short)schema->keyAttrs[i];
+        memcpy(curOffset, &keyAttr, sizeof(keyAttr));
+        curOffset += sizeof(keyAttr);
     }
-
     for(int i = 0; i < numAttr; i++){
         memcpy(curOffset, &strLen[i], sizeof(strLen[i]));
         curOffset += sizeof(strLen[i]);
         memcpy(curOffset, &schema->attrNames[i], strLen[i]);
         curOffset += strLen[i];
     }
-
+    //Freeing memory
     free(typeAndLength);
     free(keyAttrs);
     free(strLen);
     return RC_OK;
 }
 
-static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr,
-                                 RM_PageHeader * phr,
+
+static RC appendToFreeLinkedList(char * pfhr,
+                                 char * phr,
                                  BM_BufferPool * bm)
     {
     RC returnCode = RC_INIT;
@@ -853,27 +929,26 @@ static RC appendToFreeLinkedList(RM_PageFileHeader * pfhr,
     BM_PageHandle nextPageHandle;
     //this page is the header
     //update the next of page header to previous pageFileheader next
-    phr->nextFreePage = pfhr->nextFreePage;
+    setNextFreePagePH(phr,getNextFreePage(pfhr));
     //update pageFileHeader
-    pfhr->nextFreePage = phr->prevFreePage;//current page Number
+    setNextFreePage(pfhr, getPrevFreePagePH(phr));//current page Number
     //if the list isn't empty
     //update ref of the old head
-    if(pfhr->nextFreePage != NO_PAGE){
+    if(getNextFreePage(pfhr) != 0){
         //update next page Header
-        ASSERT_RC_OK(pinPage(bm, &nextPageHandle, phr->nextFreePage));
-        RM_PageHeader * nphr = (RM_PageHeader *) &nextPageHandle.data;
+        ASSERT_RC_OK(pinPage(bm, &nextPageHandle, getNextFreePagePH(phr)));
         //update the head
-        nphr->prevFreePage = phr->prevFreePage;
+        setPrevFreePagePH(nextPageHandle.data,getPrevFreePagePH(phr));
         ASSERT_RC_OK(markDirty(bm,&nextPageHandle));
         ASSERT_RC_OK(unpinPage(bm,&nextPageHandle));
     }
-    //update the prev of head to no page
-    phr->prevFreePage = NO_PAGE;
+    //update the prev of head to pageFileHeader
+    setPrevFreePagePH(phr, 0);
     return RC_OK;
     }
 
-static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
-                                     RM_PageHeader *phr,
+static RC deleteFromFreeLinkedList(char* pfhr,
+                                     char *phr,
                                      BM_BufferPool*bm)
     {
     RC returnCode = RC_INIT;
@@ -882,43 +957,144 @@ static RC deleteFromFreeLinkedList(RM_PageFileHeader* pfhr,
     BM_PageHandle nextPageHandle;
     BM_PageHandle prevPageHandle;
     //this page is the header
-    if(phr->prevFreePage == NO_PAGE){
+    if(getPrevFreePagePH(phr) == 0){
         //update pageFileHeader
-        pfhr->nextFreePage = phr->nextFreePage;
+        setNextFreePage(pfhr, getNextFreePagePH(phr) );
     }
     else{
         //update next page Header
-        ASSERT_RC_OK(pinPage(bm, &prevPageHandle, phr->prevFreePage));
-        RM_PageHeader * pphr = (RM_PageHeader *) &prevPageHandle.data;
+        ASSERT_RC_OK(pinPage(bm, &prevPageHandle, getPrevFreePagePH(phr)));
         //update the head
-        pphr->nextFreePage = phr->nextFreePage;
+        setNextFreePagePH(prevPageHandle.data, getNextFreePagePH(phr));
         ASSERT_RC_OK(markDirty(bm,&prevPageHandle));
         ASSERT_RC_OK(unpinPage(bm,&prevPageHandle));
     }
     //if the page is not the tail
-    if(phr->nextFreePage != NO_PAGE)
+    if(getNextFreePagePH(phr) != 0)
     {
         //update next page Header
-        ASSERT_RC_OK(pinPage(bm, &nextPageHandle, phr->nextFreePage));
-        RM_PageHeader * nphr = (RM_PageHeader *) &nextPageHandle.data;
+        ASSERT_RC_OK(pinPage(bm, &nextPageHandle, getNextFreePagePH(phr)));
         //update the head
-        nphr->prevFreePage = phr->prevFreePage;
+        setPrevFreePagePH(nextPageHandle.data,getPrevFreePagePH(phr));
         ASSERT_RC_OK(markDirty(bm,&nextPageHandle));
         ASSERT_RC_OK(unpinPage(bm,&nextPageHandle));
     }
     //update the current page next and prev
-    phr->nextFreePage = NO_PAGE;
-    phr->prevFreePage = NO_PAGE;
+    setNextFreePagePH(phr,0);
+    setPrevFreePagePH(phr,0);
     return RC_OK;
 }
 
-static int getRecordOffsetValue(Schema *schema, int attrNum){
+/*********************************************************************
+Gets the byte offset value of an attribute in the record for setting
+new value to the attribute or for retrieving the value from the record
+INPUT:
+	*schema: initialized schema - used for locating the attribute in record
+	attrNum: The index of the attribute in the record
+*********************************************************************/
+static int getAttrOffset(Schema *schema, int attrNum){
 	int offset = 0;
 	for(int i = 0; i < attrNum; i++) {
 		offset += schema->typeLength[i];
 	}
 	return offset;
 }
+/*********************************************************************
+calcNumSlotsPerPage solves the following equation iteratively
+
+PAGE_SIZE >= 4*i + floor((n+31)/32)/4 + n*r
+where i is sizeof(unsigned int) to account for ints in header
+where r is the size of a record for a given schema
+where n is the number of slots per page
+
+floor((n+31)/32) is used since the bitmap is stored in word-sized chunks
+floor((n+31)/32) is divided by 4 to convert from words to bytes
+Calculation assumes 32 bit words
+
+INPUT: recordSize: size of a record for a given schema
+*********************************************************************/
+static unsigned short calcNumSlotsPerPage(unsigned short recordSize){
+    //Calculates numSlotsPerPage assuming the number of bits in the
+        //bitmap exactly equals the numSlotsPerPage.
+        //Solves: PAGE_SIZE >= 4*i + n + n*r
+    unsigned short numSlotsPerPage = (PAGE_SIZE - 4*sizeof(unsigned int)) / (recordSize + 0.125);
+    //Rounds the number of bytes used by the bitmap up to the next word
+    unsigned short numBytesForBitmap = ((numSlotsPerPage+31)/32)/4;
+    //Recalculates numSlotsPerPage with the larger header
+    numSlotsPerPage = (PAGE_SIZE - 4*sizeof(unsigned int) - numBytesForBitmap) / recordSize;
+    return numSlotsPerPage;
+}
+/*********************************************************************
+*
+*               PAGE HEADER GETTERS AND SETTERS
+*
+*********************************************************************/
+static unsigned int getPrevFreePagePH(char *phrFrame){
+    unsigned int prevFreePage;
+    memcpy(&prevFreePage, phrFrame + 0, pageNumOffset);
+    return prevFreePage;
+}
+
+static unsigned int getNextFreePagePH(char *phrFrame){
+    unsigned int nextFreePage;
+    memcpy(&nextFreePage, phrFrame + pageNumOffset, pageNumOffset);
+    return nextFreePage;
+}
+
+static void setPrevFreePagePH(char * phrFrame, unsigned int pageNum){
+    memcpy(phrFrame + 0, &pageNum,pageNumOffset);
+}
+
+static void setNextFreePagePH(char * phrFrame, unsigned int pageNum){
+    memcpy(phrFrame + pageNumOffset, &pageNum,pageNumOffset);
+}
+
+static bitmap* getBitMapPH(char * phrFrame){
+    VALID_CALLOC(bitmap, b,1,sizeof(bitmap));
+    char * curOff = phrFrame + 2 * pageNumOffset;
+    //set number of bits
+    memcpy(&b->bits,curOff, sizeof(int));
+    curOff+=sizeof(int);
+    //set number of words
+    memcpy(&b->words,curOff, sizeof(int));
+    curOff +=sizeof(int);
+    //set bit Array
+    VALID_CALLOC(bitmap_type *, bitArray, b->words,sizeof(bitmap_type));
+    memcpy(bitArray,curOff, sizeof(bitmap_type)* b->words);
+    b->array =(bitmap_type*) bitArray;
+    return b;
+}
+
+static int getBitMapWordsPH(char* phrFrame){
+    int words;
+    memcpy(&words, phrFrame + sizeof(int)+ 2 * pageNumOffset, sizeof(int));
+    return words;
+}
+
+static int getBitMapBitsPH(char* phrFrame){
+    int bits;
+    memcpy(&bits, phrFrame+ 2 * pageNumOffset, sizeof(int));
+    return bits;
+}
+
+static void setBitMapPH(char * phrFrame, bitmap* b){
+    char * curOff = phrFrame + 2 * pageNumOffset;
+
+    //set number of bits
+    memcpy(curOff,&b->bits, sizeof(int));
+    curOff+=sizeof(int);
+    //set number of words
+    memcpy(curOff,&b->words, sizeof(int));
+    curOff +=sizeof(int);
+    //set bit Array
+    memcpy(curOff, b->array, sizeof(bitmap_type)* b->words);
+}
+
+static void setBitMapArrayPH(char* phrFrame, bitmap * b){
+    char * curOff = phrFrame + 2 * pageNumOffset + 2 * sizeof(int);
+    memcpy(curOff, b->array, sizeof(bitmap_type)* b->words);
+}
+
 /*********************************************************************
 *
 *               PAGEFILE HEADER GETTERS AND SETTERS
