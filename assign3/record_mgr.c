@@ -744,7 +744,9 @@ INPUT:
 RC freeRecord (Record *record)
 {
     free(record->data);
-    //record->id = NULL;
+    record->data = NULL;
+    free(record);
+    record = NULL;
 
     return RC_OK;
 }
