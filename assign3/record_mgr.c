@@ -1045,7 +1045,7 @@ static unsigned short calcNumSlotsPerPage(unsigned short recordSize){
         //Solves: PAGE_SIZE >= 4*i + n + n*r
     unsigned short numSlotsPerPage = (PAGE_SIZE - 4*sizeof(unsigned int)) / (recordSize + 0.125);
     //Rounds the number of bytes used by the bitmap up to the next word
-    unsigned short numBytesForBitmap = ((numSlotsPerPage+31)/32)/4;
+    unsigned short numBytesForBitmap = ((numSlotsPerPage+31)/32)*4;
     //Recalculates numSlotsPerPage with the larger header
     numSlotsPerPage = (PAGE_SIZE - 4*sizeof(unsigned int) - numBytesForBitmap) / recordSize;
     return numSlotsPerPage;
