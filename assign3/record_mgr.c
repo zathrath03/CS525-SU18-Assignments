@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
-#include <io.h>
+#include <unistd.h>
 
 #include "bitmap.h"
 #include "record_mgr.h"
