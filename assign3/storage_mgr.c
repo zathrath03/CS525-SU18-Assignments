@@ -117,7 +117,7 @@ RC writeBlock(int pageNum, SM_FileHandle* fHandle, SM_PageHandle memPage) {
     if (pageNum < 0)
         return RC_FILE_OFFSET_FAILED;
     //expands the file if necessary to write at pageNum
-    if ((returnCode = ensureCapacity(pageNum, fHandle)) != RC_OK)
+    if ((returnCode = ensureCapacity(pageNum+1, fHandle)) != RC_OK)
         return returnCode;
     //moves the write pointer to the correct page
     if (fseek(fHandle->mgmtInfo, pageNum*PAGE_SIZE, SEEK_SET) != 0)

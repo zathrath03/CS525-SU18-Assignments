@@ -286,9 +286,10 @@ RC insertRecord (RM_TableData *rel, Record *record){
     //setup page header if it is a new page
     if(newPageCreated)
     {
+        ASSERT_RC_OK(forcePage(bm, &pageToInsert));
         //set up pages
         setNextFreePagePH(pageToInsert.data, 0);
-        setPrevFreePagePH(pageToInsert.data, 0);
+        setPrevFreePagePH(pageToInsert.data, freePageNum);
         appendToFreeLinkedList(pageFileHeader.data, pageToInsert.data, bm);
         bitmap * b = bitmap_allocate((int) getNumSlotsPerPage(pageFileHeader.data));
         setBitMapPH(pageToInsert.data, b);
@@ -302,7 +303,7 @@ RC insertRecord (RM_TableData *rel, Record *record){
     //update record->id.slot
     record->id.slot = nextFreeSlot;
     //read location of next free slot from current slot
-    int recordSize = getRecordSizePF(pageFileHeader.data);
+    int recordSize = getRecordSize(rel->schema);
     //maybe put this into a macro
     char * slotPtr = pageToInsert.data;
     slotPtr+= 2*pageNumOffset + 2* sizeof(int);
@@ -361,7 +362,7 @@ RC deleteRecord (RM_TableData *rel, RID id){
     ASSERT_RC_OK(pinPage(bm,&pageToDelete,pageNum));
     //find free slot using pageHeader bitMap
     char * phr = pageToDelete.data;
-    int recordSize = getRecordSizePF(pageFileHeader.data);
+    int recordSize =  getRecordSize(rel->schema);
     //delete the record at id.slot
         //(offset by slot*recordSize+sizeof(short))
     char * slotPtr = phr;
@@ -715,7 +716,6 @@ INPUT:
 RC freeRecord (Record *record){
 	free(record->data);
 	//record->id = NULL;
-	free(record);
 
     return RC_OK;
 }
@@ -745,6 +745,7 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 			break;
 		}
 		case DT_STRING: {
+		    attr_val->v.stringV =(char *) calloc(sizeof(char), schema->typeLength[attrNum]);
 			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
 			break;
 		}
