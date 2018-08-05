@@ -8,7 +8,8 @@
 #include "record_mgr.h"
 
 // dynamic string
-typedef struct VarString {
+typedef struct VarString
+{
     char *buf;
     int size;
     int bufsize;
@@ -72,7 +73,8 @@ typedef struct VarString {
 static RC attrOffset (Schema *schema, int attrNum, int *result);
 
 // implementations
-char* serializeTableInfo(RM_TableData *rel) {
+char* serializeTableInfo(RM_TableData *rel)
+{
     VarString *result;
     MAKE_VARSTRING(result);
 
@@ -82,7 +84,8 @@ char* serializeTableInfo(RM_TableData *rel) {
     RETURN_STRING(result);
 }
 
-char* serializeTableContent(RM_TableData *rel) {
+char* serializeTableContent(RM_TableData *rel)
+{
     int i;
     VarString *result;
     RM_ScanHandle *sc = (RM_ScanHandle *) malloc(sizeof(RM_ScanHandle));
@@ -94,7 +97,8 @@ char* serializeTableContent(RM_TableData *rel) {
 
     startScan(rel, sc, NULL);
 
-    while(next(sc, r) != RC_RM_NO_MORE_TUPLES) {
+    while(next(sc, r) != RC_RM_NO_MORE_TUPLES)
+    {
         APPEND_STRING(result,serializeRecord(r, rel->schema));
         APPEND_STRING(result,"\n");
     }
@@ -103,16 +107,19 @@ char* serializeTableContent(RM_TableData *rel) {
     RETURN_STRING(result);
 }
 
-char* serializeSchema(Schema *schema) {
+char* serializeSchema(Schema *schema)
+{
     int i;
     VarString *result;
     MAKE_VARSTRING(result);
 
     APPEND(result, "Schema with <%i> attributes (", schema->numAttr);
 
-    for(i = 0; i < schema->numAttr; i++) {
+    for(i = 0; i < schema->numAttr; i++)
+    {
         APPEND(result,"%s%s: ", (i != 0) ? ", ": "", schema->attrNames[i]);
-        switch (schema->dataTypes[i]) {
+        switch (schema->dataTypes[i])
+        {
         case DT_INT:
             APPEND_STRING(result, "INT");
             break;
@@ -139,14 +146,16 @@ char* serializeSchema(Schema *schema) {
     RETURN_STRING(result);
 }
 
-char* serializeRecord(Record *record, Schema *schema) {
+char* serializeRecord(Record *record, Schema *schema)
+{
     VarString *result;
     MAKE_VARSTRING(result);
     int i;
 
     APPEND(result, "[%i-%i] (", record->id.page, record->id.slot);
 
-    for(i = 0; i < schema->numAttr; i++) {
+    for(i = 0; i < schema->numAttr; i++)
+    {
         APPEND_STRING(result, serializeAttr (record, schema, i));
         APPEND(result, "%s", (i == 0) ? "" : ",");
     }
@@ -156,7 +165,8 @@ char* serializeRecord(Record *record, Schema *schema) {
     RETURN_STRING(result);
 }
 
-char* serializeAttr(Record *record, Schema *schema, int attrNum) {
+char* serializeAttr(Record *record, Schema *schema, int attrNum)
+{
     int offset;
     char *attrData;
     VarString *result;
@@ -165,14 +175,17 @@ char* serializeAttr(Record *record, Schema *schema, int attrNum) {
     attrOffset(schema, attrNum, &offset);
     attrData = record->data + offset;
 
-    switch(schema->dataTypes[attrNum]) {
-    case DT_INT: {
+    switch(schema->dataTypes[attrNum])
+    {
+    case DT_INT:
+    {
         int val = 0;
         memcpy(&val,attrData, sizeof(int));
         APPEND(result, "%s:%i", schema->attrNames[attrNum], val);
     }
     break;
-    case DT_STRING: {
+    case DT_STRING:
+    {
         char *buf;
         int len = schema->typeLength[attrNum];
         buf = (char *) malloc(len + 1);
@@ -183,13 +196,15 @@ char* serializeAttr(Record *record, Schema *schema, int attrNum) {
         free(buf);
     }
     break;
-    case DT_FLOAT: {
+    case DT_FLOAT:
+    {
         float val;
         memcpy(&val,attrData, sizeof(float));
         APPEND(result, "%s:%f", schema->attrNames[attrNum], val);
     }
     break;
-    case DT_BOOL: {
+    case DT_BOOL:
+    {
         bool val;
         memcpy(&val,attrData, sizeof(bool));
         APPEND(result, "%s:%s", schema->attrNames[attrNum], val ? "TRUE" : "FALSE");
@@ -202,11 +217,13 @@ char* serializeAttr(Record *record, Schema *schema, int attrNum) {
     RETURN_STRING(result);
 }
 
-char* serializeValue(Value *val) {
+char* serializeValue(Value *val)
+{
     VarString *result;
     MAKE_VARSTRING(result);
 
-    switch(val->dt) {
+    switch(val->dt)
+    {
     case DT_INT:
         APPEND(result,"%i",val->v.intV);
         break;
@@ -224,10 +241,12 @@ char* serializeValue(Value *val) {
     RETURN_STRING(result);
 }
 
-Value* stringToValue(char *val) {
+Value* stringToValue(char *val)
+{
     Value *result = (Value *) malloc(sizeof(Value));
 
-    switch(val[0]) {
+    switch(val[0])
+    {
     case 'i':
         result->dt = DT_INT;
         result->v.intV = atoi(val + 1);
@@ -254,12 +273,14 @@ Value* stringToValue(char *val) {
     return result;
 }
 
-RC attrOffset (Schema *schema, int attrNum, int *result) {
+RC attrOffset (Schema *schema, int attrNum, int *result)
+{
     int offset = 0;
     int attrPos = 0;
 
     for(attrPos = 0; attrPos < attrNum; attrPos++)
-        switch (schema->dataTypes[attrPos]) {
+        switch (schema->dataTypes[attrPos])
+        {
         case DT_STRING:
             offset += schema->typeLength[attrPos];
             break;

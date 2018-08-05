@@ -109,7 +109,8 @@ static void setNextFreePagePH(char * phrFrame, unsigned int pageNum);
 initRecordManager doesn't seem to do anything. test_assign3_1.c just
 passes NULL in mgmtData
 *********************************************************************/
-RC initRecordManager (void *mgmtData){
+RC initRecordManager (void *mgmtData)
+{
     return RC_OK;
 }
 
@@ -117,7 +118,8 @@ RC initRecordManager (void *mgmtData){
 shutdownRecordManager also doesn't seem to need to do anything.
 Does not need to free RID or table (freed in test_assign3_1.C)
 *********************************************************************/
-RC shutdownRecordManager (){
+RC shutdownRecordManager ()
+{
     return RC_OK;
 }
 
@@ -129,7 +131,8 @@ INPUT:
     name: valid string file name
     schema: fully initialized schema
 *********************************************************************/
-RC createTable (char *name, Schema *schema){
+RC createTable (char *name, Schema *schema)
+{
     RC returnCode = RC_INIT;
     //validate input
     if(!name || !schema)
@@ -161,7 +164,8 @@ INPUT:
     *rel: pointer to allocated memory of an uninitialized RM_TableData
     *name: valid string file name
 *********************************************************************/
-RC openTable (RM_TableData *rel, char *name){
+RC openTable (RM_TableData *rel, char *name)
+{
     RC returnCode = RC_INIT;
     // validate input
     if(!rel || !name)
@@ -196,7 +200,8 @@ closeTable causes all outstanding changes to the table to be written
 to the page file
 INPUT: pointer to an initialized RM_TableData struct
 *********************************************************************/
-RC closeTable (RM_TableData *rel){
+RC closeTable (RM_TableData *rel)
+{
     // validate input
     if(!rel)
         return RC_RM_INIT_ERROR;
@@ -215,7 +220,8 @@ RC closeTable (RM_TableData *rel){
 deleteTable deletes the underlying page file
 INPUT: name of the pageFile where the table is stored
 *********************************************************************/
-RC deleteTable (char *name){
+RC deleteTable (char *name)
+{
     // validate input
     if(!name)
         return RC_RM_INIT_ERROR;
@@ -228,7 +234,8 @@ RC deleteTable (char *name){
 getNumTuples returns the number of tuples in the table
 INPUT: initialized RM_TableData of interest
 *********************************************************************/
-int getNumTuples (RM_TableData *rel){
+int getNumTuples (RM_TableData *rel)
+{
     // validate input
     if(!rel)
         return RC_RM_INIT_ERROR;
@@ -256,7 +263,8 @@ INPUT:
     *rel: initialized RM_TableData to insert the record into
     *record: id is null, *data contains record to insert
 *********************************************************************/
-RC insertRecord (RM_TableData *rel, Record *record){
+RC insertRecord (RM_TableData *rel, Record *record)
+{
     RC returnCode = RC_INIT;
     bool newPageCreated = false;
 
@@ -333,7 +341,7 @@ RC insertRecord (RM_TableData *rel, Record *record){
     ASSERT_RC_OK(unpinPage(bm,&pageFileHeader));
     ASSERT_RC_OK(unpinPage(bm,&pageToInsert));
     //we shouldn't need to worry about writing it back to disk
-        //that will be handled by page replacement
+    //that will be handled by page replacement
     return RC_OK;
 }
 
@@ -345,7 +353,8 @@ INPUT:
     *rel: initialized RM_TableData to insert the record into
     id: initialized with the page and slot of the record of interest
 *********************************************************************/
-RC deleteRecord (RM_TableData *rel, RID id){
+RC deleteRecord (RM_TableData *rel, RID id)
+{
     RC returnCode = RC_INIT;
     //get location
     int pageNum = id.page;
@@ -363,7 +372,7 @@ RC deleteRecord (RM_TableData *rel, RID id){
     char * phr = pageToDelete.data;
     int recordSize =  getRecordSize(rel->schema);
     //delete the record at id.slot
-        //(offset by slot*recordSize+sizeof(short))
+    //(offset by slot*recordSize+sizeof(short))
     char * slotPtr = phr;
     slotPtr+= 2*pageNumOffset + 2* sizeof(int);
     slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
@@ -396,7 +405,7 @@ RC deleteRecord (RM_TableData *rel, RID id){
     ASSERT_RC_OK(unpinPage(bm,&pageFileHeader));
     ASSERT_RC_OK(unpinPage(bm,&pageToDelete));
     //we shouldn't need to worry about writing it back to disk
-        //that will be handled by page replacement
+    //that will be handled by page replacement
     return RC_OK;
 }
 
@@ -406,7 +415,8 @@ INPUT:
     *rel: initialized RM_TableData to update the record of
     *record: id contains page and slot, *data contains record to insert
 *********************************************************************/
-RC updateRecord (RM_TableData *rel, Record *record){
+RC updateRecord (RM_TableData *rel, Record *record)
+{
     RC returnCode = RC_INIT;
     //validate input
     if(!rel)
@@ -438,7 +448,7 @@ RC updateRecord (RM_TableData *rel, Record *record){
     //unpin the pageFile header and the page we inserted the record into
     ASSERT_RC_OK(unpinPage(bm,&pageToUpdate));
     //we shouldn't need to worry about writing it back to disk
-        //that will be handled by page replacement
+    //that will be handled by page replacement
     return RC_OK;
 }
 
@@ -449,7 +459,8 @@ INPUT:
     id: contains the page and slot of the record of interest
     *record: allocated, but uninitiated Record to store data in
 *********************************************************************/
-RC getRecord (RM_TableData *rel, RID id, Record *record){
+RC getRecord (RM_TableData *rel, RID id, Record *record)
+{
     RC returnCode = RC_INIT;
     //validate input
     if(!rel)
@@ -482,7 +493,7 @@ RC getRecord (RM_TableData *rel, RID id, Record *record){
     //unpin the page we of the record we got
     ASSERT_RC_OK(unpinPage(bm,&pageToGet));
     //we shouldn't need to worry about writing it back to disk
-        //that will be handled by page replacement
+    //that will be handled by page replacement
     return RC_OK;
 }
 
@@ -496,7 +507,8 @@ startScan: Initializes the RM_ScanHandle data structure
 INPUT: initialized relation, instance of ScanHandle, and the condition
 RETURNS: RC_OK
 *********************************************************************/
-RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond){
+RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond)
+{
     //Validation of inputs
     if(!rel || !scan || !cond)  //If input is invalid then return error code
         return RC_RM_INIT_ERROR;
@@ -516,7 +528,8 @@ INPUT: Instance of ScanHandle (if NULL is passed, then all tuples of
 Return: RC_RM_NO_MORE_TUPLES once scan is completed
         RC_OK otherwise
 *********************************************************************/
-RC next (RM_ScanHandle *scan, Record *record){
+RC next (RM_ScanHandle *scan, Record *record)
+{
     RC returnCode = RC_INIT;
     SM_FileHandle fHandle;
     BM_PageHandle pageFileHeader;
@@ -524,7 +537,7 @@ RC next (RM_ScanHandle *scan, Record *record){
     BM_BufferPool* bm = scan->rel->bufferPool;
     //Validation of inputs
     if(!record)    //If input is invalid then return error code
-      return RC_RM_INIT_ERROR;
+        return RC_RM_INIT_ERROR;
 
     // open the page file
     ASSERT_RC_OK(openPageFile(scan->rel->name, &fHandle));
@@ -538,37 +551,38 @@ RC next (RM_ScanHandle *scan, Record *record){
     Value * result;
     //Iterate through the pages on disk and pin to bufferpool and search over bitmap of that page
     int recordSize = getRecordSize(scan->rel->schema);
-    for(; scan->pageNum<numPages; scan->pageNum++){
-      ASSERT_RC_OK(pinPage(bm,&curPage,scan->pageNum));
-      char * phr = curPage.data;//used to find used slot
-      //point to bitmap in the current page
-      //TODO: have address of bitmap be pointed by a variable (lets call it bitmap just for use in while loop)
-      bitmap * b = getBitMapPH(phr);
-      //while we did not reach the end of the slot
-      while(scan->slotNum < getNumSlotsPerPage(pfhr)){
-        //utilize bitmap_read(bitmap, int n) to retrieve bit
-        //if bit = 1, then store the data (record) at that position in the page into record->id.slot
-        if(bitmap_read(b,scan->slotNum)==1)
+    for(; scan->pageNum<numPages; scan->pageNum++)
+    {
+        ASSERT_RC_OK(pinPage(bm,&curPage,scan->pageNum));
+        char * phr = curPage.data;//used to find used slot
+        //point to bitmap in the current page
+        //TODO: have address of bitmap be pointed by a variable (lets call it bitmap just for use in while loop)
+        bitmap * b = getBitMapPH(phr);
+        //while we did not reach the end of the slot
+        for(; scan->slotNum < getNumSlotsPerPage(pfhr); ++scan->slotNum)
         {
-          RID rid;
-          rid.page = scan->pageNum;
-          rid.slot = scan->slotNum;
-          ASSERT_RC_OK(getRecord(scan->rel,rid,record));
-          ASSERT_RC_OK(evalExpr(record, scan->rel->schema, scan->mgmtData, &result));
-
-          if(result->v.boolV || scan->mgmtData == NULL){
-            //if the condition matches, then update the scanHandle so that now has the tuple in it
-            //memcpy(record->data, slotPtr, getRecordSize(scan->rel->schema));
-            record->id.page = scan->pageNum;
-            record->id.slot = scan->slotNum;
-            free(result);
-            scan->slotNum++;
-            return RC_OK;
-          }
+            //utilize bitmap_read(bitmap, int n) to retrieve bit
+            //if bit = 1, then store the data (record) at that position in the page into record->id.slot
+            if(bitmap_read(b,scan->slotNum)==1)
+            {
+                RID rid;
+                rid.page = scan->pageNum;
+                rid.slot = scan->slotNum;
+                ASSERT_RC_OK(getRecord(scan->rel,rid,record));
+                ASSERT_RC_OK(evalExpr(record, scan->rel->schema, scan->mgmtData, &result));
+                if(result->v.boolV || scan->mgmtData == NULL)
+                {
+                    //return record
+                    record->id.page = scan->pageNum;
+                    record->id.slot = scan->slotNum;
+                    free(result);
+                    bitmap_deallocate(b);
+                    ++scan->slotNum;
+                    return RC_OK;
+                }
+            }
         }
-        scan->slotNum++;
-
-      }
+        bitmap_deallocate(b);
     }
     free(result);
     return RC_RM_NO_MORE_TUPLES;
@@ -579,7 +593,8 @@ closeScan: Finishes the scan
 INPUT: Instance of ScanHandle
 RETURNS: RC_OK
 *********************************************************************/
-RC closeScan (RM_ScanHandle *scan){
+RC closeScan (RM_ScanHandle *scan)
+{
     /*free(scan->mgmtData);
     scan->mgmtData = NULL;*/
     return RC_OK;
@@ -596,9 +611,11 @@ recordSize
 INPUT: initialized Schema
 RETURNS: the size of a single record for the provided schema
 *********************************************************************/
-int getRecordSize (Schema *schema){
+int getRecordSize (Schema *schema)
+{
     int recordSize = 0;
-    for(int i = 0; i < schema->numAttr; i++){
+    for(int i = 0; i < schema->numAttr; i++)
+    {
         recordSize += schema->typeLength[i];
     }
     return recordSize;
@@ -612,7 +629,8 @@ INPUT: Initialized values for all members of the Schema struct
         including the null terminator. Zero otherwise
 *********************************************************************/
 Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
-                      int *typeLength, int keySize, int *keys){
+                      int *typeLength, int keySize, int *keys)
+{
     //Allocate memory for all arrays in schema struct
     VALID_CALLOC(Schema, schema, 1, sizeof(Schema));
     VALID_CALLOC(char*, schAttrNames, numAttr, sizeof(char*));
@@ -622,12 +640,14 @@ Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
 
 
     //initializing arrays with the parameters passed to the function
-    for(int i = 0; i < numAttr; i++){
+    for(int i = 0; i < numAttr; i++)
+    {
         //dataTypes and keys is a straight-forward copy values from input
         schDataTypes[i] = dataTypes[i];
         schKeyAttrs[i] = keys[i];
         //typeLength only includes a length for the strings, 0 otherwise
-        switch (dataTypes[i]){
+        switch (dataTypes[i])
+        {
         case DT_INT:
             schTypeLength[i] = sizeof(int);
             break;
@@ -643,9 +663,13 @@ Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
         }
         //NOTE: typeLength does not include the null terminator for strings
         schAttrNames[i] = (char*) calloc(1, strlen(attrNames[i]));
-        if(!schAttrNames[i]){                                   \
-            printError(RC_BM_MEMORY_ALOC_FAIL);         \
-            exit(-1);                                   \
+        if(!schAttrNames[i])
+        {
+            \
+            printError(RC_BM_MEMORY_ALOC_FAIL);
+            \
+            exit(-1);
+            \
         }
         strncpy(schAttrNames[i], attrNames[i], strlen(attrNames[i]));
     }
@@ -664,8 +688,10 @@ freeSchema frees all memory associated with a Schema struct, including
 the memory for the struct itself
 INPUT: initialized Schema
 *********************************************************************/
-RC freeSchema (Schema *schema){
-    for(int i = 0; i < schema->numAttr; i++){
+RC freeSchema (Schema *schema)
+{
+    for(int i = 0; i < schema->numAttr; i++)
+    {
         free(schema->attrNames[i]);
         schema->attrNames[i] = NULL;
     }
@@ -695,10 +721,11 @@ INPUT:
 			  for Record
 	*schema: pointer to pre initialized schema
 *********************************************************************/
-RC createRecord (Record **record, Schema *schema){
+RC createRecord (Record **record, Schema *schema)
+{
     //Validate passed input
     if(!record || !schema)
-      return RC_RM_INIT_ERROR;
+        return RC_RM_INIT_ERROR;
     //Allocate memory for the new record and its data
     //And initialize to all 0's
     VALID_CALLOC(Record, rec, 1, sizeof(Record));
@@ -714,9 +741,10 @@ the memory for the struct
 INPUT:
 	*record: pointer of the populated record struct
 *********************************************************************/
-RC freeRecord (Record *record){
-	free(record->data);
-	//record->id = NULL;
+RC freeRecord (Record *record)
+{
+    free(record->data);
+    //record->id = NULL;
 
     return RC_OK;
 }
@@ -730,41 +758,47 @@ INPUT:
 	attrNum: The index of the attribute in the record
 	**value: the pointer where the retrieved attribute value is stored
 *********************************************************************/
-RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
-	char *attr_offset = record->data + getAttrOffset(schema, attrNum);
+RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
+{
+    char *attr_offset = record->data + getAttrOffset(schema, attrNum);
 
-	//Value *attr_val = (Value *) malloc(sizeof(Value));
-	VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
+    //Value *attr_val = (Value *) malloc(sizeof(Value));
+    VALID_CALLOC(Value, attr_val, 1, sizeof(Value));
 
-	attr_val->dt = schema->dataTypes[attrNum];
+    attr_val->dt = schema->dataTypes[attrNum];
 
-	// use memcpy
-	switch(schema->dataTypes[attrNum]) {
-		case DT_INT:{
-			memcpy(&(attr_val->v.intV), attr_offset, schema->typeLength[attrNum]);
-			//attr_val->v.intV = *(int *)attr_offset;
-			break;
-		}
-		case DT_STRING: {
-		    attr_val->v.stringV =(char *) calloc(schema->typeLength[attrNum]+1, sizeof(char));
-			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
-			//memcpy(attr_val->v.stringV[schema->typeLength[attrNum]], '\0',1);
-			//attr_val->v.stringV[schema->typeLength[attrNum]]='\0';
-			break;
-		}
-		case DT_FLOAT: {
-			memcpy(&(attr_val->v.floatV), attr_offset, schema->typeLength[attrNum]);
-			//attr_val->v.floatV = *(float *)attr_offset;
-			break;
-		}
-		case DT_BOOL: {
-			memcpy(&(attr_val->v.boolV), attr_offset, schema->typeLength[attrNum]);
-			//attr_val->v.boolV = *(bool *)attr_offset;
-			break;
-		}
-	}
+    // use memcpy
+    switch(schema->dataTypes[attrNum])
+    {
+    case DT_INT:
+    {
+        memcpy(&(attr_val->v.intV), attr_offset, schema->typeLength[attrNum]);
+        //attr_val->v.intV = *(int *)attr_offset;
+        break;
+    }
+    case DT_STRING:
+    {
+        attr_val->v.stringV =(char *) calloc(schema->typeLength[attrNum]+1, sizeof(char));
+        memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
+        //memcpy(attr_val->v.stringV[schema->typeLength[attrNum]], '\0',1);
+        //attr_val->v.stringV[schema->typeLength[attrNum]]='\0';
+        break;
+    }
+    case DT_FLOAT:
+    {
+        memcpy(&(attr_val->v.floatV), attr_offset, schema->typeLength[attrNum]);
+        //attr_val->v.floatV = *(float *)attr_offset;
+        break;
+    }
+    case DT_BOOL:
+    {
+        memcpy(&(attr_val->v.boolV), attr_offset, schema->typeLength[attrNum]);
+        //attr_val->v.boolV = *(bool *)attr_offset;
+        break;
+    }
+    }
 
-	*value = attr_val;
+    *value = attr_val;
     return RC_OK;
 }
 
@@ -777,33 +811,39 @@ INPUT:
 	attrNum: The index of the attribute in the record to be updated
 	*value: pointer to the new value the record is to be updated with
 *********************************************************************/
-RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
-	char *attr_offset = record->data + getAttrOffset(schema, attrNum);
+RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
+{
+    char *attr_offset = record->data + getAttrOffset(schema, attrNum);
 
-	switch(schema->dataTypes[attrNum]) {
-		case DT_INT:{
-			memcpy(attr_offset, &(value->v.intV), schema->typeLength[attrNum]);
-			//*(int *)attr_offset = attr_val->v.intV;
-			break;
-		}
-		case DT_STRING: {
-			memcpy(attr_offset, value->v.stringV, schema->typeLength[attrNum]);
-			attr_offset[schema->typeLength[attrNum]]='\0';
-			break;
-		}
-		case DT_FLOAT: {
-			memcpy(attr_offset, &(value->v.floatV), schema->typeLength[attrNum]);
-			//*(float *)attr_offset = attr_val->v.floatV;
-			break;
-		}
-		case DT_BOOL: {
-			memcpy(attr_offset, &(value->v.boolV), schema->typeLength[attrNum]);
-			//*(bool *)attr_offset = attr_val->v.boolV;
-			break;
-		}
-	}
+    switch(schema->dataTypes[attrNum])
+    {
+    case DT_INT:
+    {
+        memcpy(attr_offset, &(value->v.intV), schema->typeLength[attrNum]);
+        //*(int *)attr_offset = attr_val->v.intV;
+        break;
+    }
+    case DT_STRING:
+    {
+        memcpy(attr_offset, value->v.stringV, schema->typeLength[attrNum]);
+        attr_offset[schema->typeLength[attrNum]]='\0';
+        break;
+    }
+    case DT_FLOAT:
+    {
+        memcpy(attr_offset, &(value->v.floatV), schema->typeLength[attrNum]);
+        //*(float *)attr_offset = attr_val->v.floatV;
+        break;
+    }
+    case DT_BOOL:
+    {
+        memcpy(attr_offset, &(value->v.boolV), schema->typeLength[attrNum]);
+        //*(bool *)attr_offset = attr_val->v.boolV;
+        break;
+    }
+    }
 
-	return RC_OK;
+    return RC_OK;
 }
 
 /*********************************************************************
@@ -816,9 +856,10 @@ RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
 checks if the bitMap has a free slot if not it return bitMap size as
 the next free slot index
 *********************************************************************/
-int static findFreeSlot(bitmap * bitMap){
+int static findFreeSlot(bitmap * bitMap)
+{
     int mapSize = bitMap->bits;
-    for(int i=0; i<mapSize;i++)
+    for(int i=0; i<mapSize; i++)
     {
         if(bitmap_read(bitMap,i)==0)
         {
@@ -880,7 +921,8 @@ SCHEMA OFFSETS FROM START OF SCHEMA
     Offset to a specific attribute's name will need to be calculated
         using the strlen's
 *********************************************************************/
-static RC preparePFHdr(Schema *schema, char *pHandle){
+static RC preparePFHdr(Schema *schema, char *pHandle)
+{
     //validate input
     if(!schema || !pHandle)
         return RC_RM_INIT_ERROR;
@@ -900,7 +942,8 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     unsigned short sizeOfAttrNames = 0;
     VALID_CALLOC(unsigned short, strLen, numAttr, sizeof(unsigned short));
     //Retrieve data from arrays and format how we want
-    for(int i = 0; i < numAttr; i++){
+    for(int i = 0; i < numAttr; i++)
+    {
         typeAndLength[2*i] = (unsigned short) schema->dataTypes[i];
         typeAndLength[(2*i)+1] = (unsigned short) schema->typeLength[i];
         strLen[i] = (unsigned short) strlen(schema->attrNames[i]);
@@ -924,7 +967,8 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     memcpy(curOffset, &numAttr, sizeof(numAttr));
     curOffset += sizeof(numAttr);
     //Populating the pageHandle with array data
-    for(int i = 0; i < 2*numAttr; i++){
+    for(int i = 0; i < 2*numAttr; i++)
+    {
         memcpy(curOffset, &typeAndLength[i], sizeof(typeAndLength[i]));
         curOffset += sizeof(typeAndLength[i]);
     }
@@ -933,12 +977,14 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
     curOffset += sizeof(keySize);
     //Populating the pageHandle with array data
     unsigned short keyAttr;
-    for(int i = 0; i < keySize; i++){
+    for(int i = 0; i < keySize; i++)
+    {
         keyAttr = (unsigned short)schema->keyAttrs[i];
         memcpy(curOffset, &keyAttr, sizeof(keyAttr));
         curOffset += sizeof(keyAttr);
     }
-    for(int i = 0; i < numAttr; i++){
+    for(int i = 0; i < numAttr; i++)
+    {
         memcpy(curOffset, &strLen[i], sizeof(strLen[i]));
         curOffset += sizeof(strLen[i]);
         memcpy(curOffset, &schema->attrNames[i], strLen[i]);
@@ -955,7 +1001,7 @@ static RC preparePFHdr(Schema *schema, char *pHandle){
 static RC appendToFreeLinkedList(char * pfhr,
                                  char * phr,
                                  BM_BufferPool * bm)
-    {
+{
     RC returnCode = RC_INIT;
     //update nextPage, prevPage
     BM_PageHandle nextPageHandle;
@@ -966,7 +1012,8 @@ static RC appendToFreeLinkedList(char * pfhr,
     setNextFreePage(pfhr, getPrevFreePagePH(phr));//current page Number
     //if the list isn't empty
     //update ref of the old head
-    if(getNextFreePage(pfhr) != 0){
+    if(getNextFreePage(pfhr) != 0)
+    {
         //update next page Header
         ASSERT_RC_OK(pinPage(bm, &nextPageHandle, getNextFreePagePH(phr)));
         //update the head
@@ -977,23 +1024,25 @@ static RC appendToFreeLinkedList(char * pfhr,
     //update the prev of head to pageFileHeader
     setPrevFreePagePH(phr, 0);
     return RC_OK;
-    }
+}
 
 static RC deleteFromFreeLinkedList(char* pfhr,
-                                     char *phr,
-                                     BM_BufferPool*bm)
-    {
+                                   char *phr,
+                                   BM_BufferPool*bm)
+{
     RC returnCode = RC_INIT;
 
     //update nextPage, prevPage
     BM_PageHandle nextPageHandle;
     BM_PageHandle prevPageHandle;
     //this page is the header
-    if(getPrevFreePagePH(phr) == 0){
+    if(getPrevFreePagePH(phr) == 0)
+    {
         //update pageFileHeader
         setNextFreePage(pfhr, getNextFreePagePH(phr) );
     }
-    else{
+    else
+    {
         //update next page Header
         ASSERT_RC_OK(pinPage(bm, &prevPageHandle, getPrevFreePagePH(phr)));
         //update the head
@@ -1024,12 +1073,14 @@ INPUT:
 	*schema: initialized schema - used for locating the attribute in record
 	attrNum: The index of the attribute in the record
 *********************************************************************/
-static int getAttrOffset(Schema *schema, int attrNum){
-	int offset = 0;
-	for(int i = 0; i < attrNum; i++) {
-		offset += schema->typeLength[i];
-	}
-	return offset;
+static int getAttrOffset(Schema *schema, int attrNum)
+{
+    int offset = 0;
+    for(int i = 0; i < attrNum; i++)
+    {
+        offset += schema->typeLength[i];
+    }
+    return offset;
 }
 /*********************************************************************
 calcNumSlotsPerPage solves the following equation iteratively
@@ -1045,10 +1096,11 @@ Calculation assumes 32 bit words
 
 INPUT: recordSize: size of a record for a given schema
 *********************************************************************/
-static unsigned short calcNumSlotsPerPage(unsigned short recordSize){
+static unsigned short calcNumSlotsPerPage(unsigned short recordSize)
+{
     //Calculates numSlotsPerPage assuming the number of bits in the
-        //bitmap exactly equals the numSlotsPerPage.
-        //Solves: PAGE_SIZE >= 4*i + n + n*r
+    //bitmap exactly equals the numSlotsPerPage.
+    //Solves: PAGE_SIZE >= 4*i + n + n*r
     unsigned short numSlotsPerPage = (PAGE_SIZE - 4*sizeof(unsigned int)) / (recordSize + 0.125);
     //Rounds the number of bytes used by the bitmap up to the next word
     unsigned short numBytesForBitmap = ((numSlotsPerPage+31)/32)*4;
@@ -1061,27 +1113,32 @@ static unsigned short calcNumSlotsPerPage(unsigned short recordSize){
 *               PAGE HEADER GETTERS AND SETTERS
 *
 *********************************************************************/
-static unsigned int getPrevFreePagePH(char *phrFrame){
+static unsigned int getPrevFreePagePH(char *phrFrame)
+{
     unsigned int prevFreePage;
     memcpy(&prevFreePage, phrFrame + 0, pageNumOffset);
     return prevFreePage;
 }
 
-static unsigned int getNextFreePagePH(char *phrFrame){
+static unsigned int getNextFreePagePH(char *phrFrame)
+{
     unsigned int nextFreePage;
     memcpy(&nextFreePage, phrFrame + pageNumOffset, pageNumOffset);
     return nextFreePage;
 }
 
-static void setPrevFreePagePH(char * phrFrame, unsigned int pageNum){
+static void setPrevFreePagePH(char * phrFrame, unsigned int pageNum)
+{
     memcpy(phrFrame + 0, &pageNum,pageNumOffset);
 }
 
-static void setNextFreePagePH(char * phrFrame, unsigned int pageNum){
+static void setNextFreePagePH(char * phrFrame, unsigned int pageNum)
+{
     memcpy(phrFrame + pageNumOffset, &pageNum,pageNumOffset);
 }
 
-static bitmap* getBitMapPH(char * phrFrame){
+static bitmap* getBitMapPH(char * phrFrame)
+{
     VALID_CALLOC(bitmap, b,1,sizeof(bitmap));
     char * curOff = phrFrame + 2 * pageNumOffset;
     //set number of bits
@@ -1097,19 +1154,22 @@ static bitmap* getBitMapPH(char * phrFrame){
     return b;
 }
 
-static int getBitMapWordsPH(char* phrFrame){
+static int getBitMapWordsPH(char* phrFrame)
+{
     int words;
     memcpy(&words, phrFrame + sizeof(int)+ 2 * pageNumOffset, sizeof(int));
     return words;
 }
 
-static int getBitMapBitsPH(char* phrFrame){
+static int getBitMapBitsPH(char* phrFrame)
+{
     int bits;
     memcpy(&bits, phrFrame+ 2 * pageNumOffset, sizeof(int));
     return bits;
 }
 
-static void setBitMapPH(char * phrFrame, bitmap* b){
+static void setBitMapPH(char * phrFrame, bitmap* b)
+{
     char * curOff = phrFrame + 2 * pageNumOffset;
 
     //set number of bits
@@ -1122,7 +1182,8 @@ static void setBitMapPH(char * phrFrame, bitmap* b){
     memcpy(curOff, b->array, sizeof(bitmap_type)* b->words);
 }
 
-static void setBitMapArrayPH(char* phrFrame, bitmap * b){
+static void setBitMapArrayPH(char* phrFrame, bitmap * b)
+{
     char * curOff = phrFrame + 2 * pageNumOffset + 2 * sizeof(int);
     memcpy(curOff, b->array, sizeof(bitmap_type)* b->words);
 }
@@ -1132,38 +1193,46 @@ static void setBitMapArrayPH(char* phrFrame, bitmap * b){
 *               PAGEFILE HEADER GETTERS AND SETTERS
 *
 *********************************************************************/
-static unsigned short getRecordSizePF(char *pfHdrFrame){
+static unsigned short getRecordSizePF(char *pfHdrFrame)
+{
     unsigned short recordSize;
     memcpy(&recordSize, pfHdrFrame + recordSizeOffset, sizeof(unsigned short));
     return recordSize;
 }
-static unsigned int getNumTuplesPF(char *pfHdrFrame){
+static unsigned int getNumTuplesPF(char *pfHdrFrame)
+{
     unsigned int numTuples;
     memcpy(&numTuples, pfHdrFrame + numTuplesOffset, sizeof(unsigned int));
     return numTuples;
 }
-static void setNumTuplesPF(char *pfHdrFrame, unsigned int numTuples){
+static void setNumTuplesPF(char *pfHdrFrame, unsigned int numTuples)
+{
     memcpy(pfHdrFrame + numTuplesOffset, &numTuples, sizeof(unsigned int));
 }
-static unsigned int getNextFreePage(char *pfHdrFrame){
+static unsigned int getNextFreePage(char *pfHdrFrame)
+{
     unsigned int nextFreePage;
     memcpy(&nextFreePage, pfHdrFrame + nextFreePageOffset, sizeof(unsigned int));
     return nextFreePage;
 }
-static void setNextFreePage(char *pfHdrFrame, unsigned int nextFreePage){
+static void setNextFreePage(char *pfHdrFrame, unsigned int nextFreePage)
+{
     memcpy(pfHdrFrame + nextFreePageOffset, &nextFreePage, sizeof(unsigned int));
 }
-static unsigned short getNumSlotsPerPage(char *pfHdrFrame){
+static unsigned short getNumSlotsPerPage(char *pfHdrFrame)
+{
     unsigned short numSlotsPerPage;
     memcpy(&numSlotsPerPage, pfHdrFrame + numSlotsPerPageOffset, sizeof(unsigned short));
     return numSlotsPerPage;
 }
-static unsigned short getSchemaSize(char *pfHdrFrame){
+static unsigned short getSchemaSize(char *pfHdrFrame)
+{
     unsigned short schemaSize;
     memcpy(&schemaSize, pfHdrFrame + schemaSizeOffset, sizeof(unsigned short));
     return schemaSize;
 }
-static void getSchema(char *pfHdrFrame, Schema *schema){
+static void getSchema(char *pfHdrFrame, Schema *schema)
+{
     //store values of non-array variables
     schema->numAttr = getNumAttr(pfHdrFrame);
     schema->keySize = getKeySize(pfHdrFrame);
@@ -1178,24 +1247,29 @@ static void getSchema(char *pfHdrFrame, Schema *schema){
     schema->typeLength = typeLength;
     schema->keyAttrs = keyAttrs;
     //Populate arrays in the schema
-    for(int i = 0; i < schema->numAttr; i++){
+    for(int i = 0; i < schema->numAttr; i++)
+    {
         schema->dataTypes[i] = getIthDataType(pfHdrFrame, i);
         schema->typeLength[i] = getIthTypeLength(pfHdrFrame, i);
         schema->attrNames[i] = getIthAttrName(pfHdrFrame, i);
     }
-    for(int i = 0; i < schema->keySize; i++){
+    for(int i = 0; i < schema->keySize; i++)
+    {
         keyAttrs[i] = getIthKeyAttr(pfHdrFrame, i);
     }
 }
-static unsigned short getNumAttr(char *pfHdrFrame){
+static unsigned short getNumAttr(char *pfHdrFrame)
+{
     unsigned short numAttr;
     memcpy(&numAttr, pfHdrFrame + numAttrOffset, sizeof(unsigned short));
     return numAttr;
 }
-static DataType getIthDataType(char *pfHdrFrame, int ithSlot){
+static DataType getIthDataType(char *pfHdrFrame, int ithSlot)
+{
     unsigned short dataType;
     memcpy(&dataType, pfHdrFrame + dataTypeOffset(ithSlot), sizeof(unsigned short));
-    switch(dataType){
+    switch(dataType)
+    {
     case 0:
         return DT_INT;
     case 1:
@@ -1208,40 +1282,47 @@ static DataType getIthDataType(char *pfHdrFrame, int ithSlot){
         return DT_INT;
     }
 }
-static unsigned short getIthTypeLength(char *pfHdrFrame, int ithSlot){
+static unsigned short getIthTypeLength(char *pfHdrFrame, int ithSlot)
+{
     unsigned short typeLength;
     memcpy(&typeLength, pfHdrFrame + typeLengthOffset(ithSlot), sizeof(unsigned short));
     return typeLength;
 }
-static unsigned short getKeySize(char *pfHdrFrame){
+static unsigned short getKeySize(char *pfHdrFrame)
+{
     unsigned short keySize;
     unsigned short numAttr = getNumAttr(pfHdrFrame);
     memcpy(&keySize, pfHdrFrame + keySizeOffset, sizeof(unsigned short));
     return keySize;
 }
-static unsigned short getIthKeyAttr(char *pfHdrFrame, int ithSlot){
+static unsigned short getIthKeyAttr(char *pfHdrFrame, int ithSlot)
+{
     unsigned short keyAttr;
     unsigned short numAttr = getNumAttr(pfHdrFrame);
     memcpy(&keyAttr, pfHdrFrame + keyAttrOffset(ithSlot), sizeof(unsigned short));
     return keyAttr;
 }
-static unsigned short getIthNameLength(char *pfHdrFrame, int ithSlot){
+static unsigned short getIthNameLength(char *pfHdrFrame, int ithSlot)
+{
     unsigned short nameLength;
     unsigned short numAttr = getNumAttr(pfHdrFrame);
     unsigned short keySize = getKeySize(pfHdrFrame);
     char *ptr = pfHdrFrame + attrNamesOffset;
-    for(int i = 0; i <= ithSlot; i++){
+    for(int i = 0; i <= ithSlot; i++)
+    {
         memcpy(&nameLength, ptr, sizeof(unsigned short));
         ptr = ptr + nameLength + sizeof(unsigned short);
     }
     return nameLength;
 }
-static char* getIthAttrName(char *pfHdrFrame, int ithSlot){
+static char* getIthAttrName(char *pfHdrFrame, int ithSlot)
+{
     unsigned short nameLength;
     unsigned short numAttr = getNumAttr(pfHdrFrame);
     unsigned short keySize = getKeySize(pfHdrFrame);
     char *ptr = pfHdrFrame + attrNamesOffset + sizeof(unsigned short);
-    for(int i = 0; i < ithSlot; i++){
+    for(int i = 0; i < ithSlot; i++)
+    {
         nameLength = getIthNameLength(pfHdrFrame, i);
         ptr = ptr + nameLength + sizeof(unsigned short);
     }

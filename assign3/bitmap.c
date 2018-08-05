@@ -9,17 +9,17 @@ Source: http://www.cse.psu.edu/~deh25/cmpsc473/assignments/HW1/bitmap.c
 
 ********************************************************/
 #ifdef bitmap_64 // assumed to be 64 bits
-  #define bitmap_type unsigned long long int
-  #define bitmap_shift        6
-  #define bitmap_mask        63
-  #define bitmap_wordlength  64
-  #define bitmap_fmt "%016llx"
+    #define bitmap_type unsigned long long int
+    #define bitmap_shift        6
+    #define bitmap_mask        63
+    #define bitmap_wordlength  64
+    #define bitmap_fmt "%016llx"
 #else	// assumed to be 32 bits
-  #define bitmap_type unsigned int
-  #define bitmap_shift        5
-  #define bitmap_mask        31
-  #define bitmap_wordlength  32
-  #define bitmap_fmt "%08x"
+    #define bitmap_type unsigned int
+    #define bitmap_shift        5
+    #define bitmap_mask        31
+    #define bitmap_wordlength  32
+    #define bitmap_fmt "%08x"
 #endif
 
 // get the types right
@@ -29,46 +29,48 @@ Source: http://www.cse.psu.edu/~deh25/cmpsc473/assignments/HW1/bitmap.c
 
 void bitmap_set(bitmap *b, int n)
 {
-  int word = n >> bitmap_shift;		// n / bitmap_wordlength
-  int position = n & bitmap_mask;	// n % bitmap_wordlength
-  b->array[word] |= bitmap_one << position;
+    int word = n >> bitmap_shift;		// n / bitmap_wordlength
+    int position = n & bitmap_mask;	// n % bitmap_wordlength
+    b->array[word] |= bitmap_one << position;
 }
 
 void bitmap_clear(bitmap *b, int n)
 {
-  int word = n >> bitmap_shift;         // n / bitmap_wordlength
-  int position = n & bitmap_mask;       // n % bitmap_wordlength
-  b->array[word] &= ~(bitmap_one << position);
+    int word = n >> bitmap_shift;         // n / bitmap_wordlength
+    int position = n & bitmap_mask;       // n % bitmap_wordlength
+    b->array[word] &= ~(bitmap_one << position);
 }
 
 int  bitmap_read(bitmap *b, int n)
 {
-  int word = n >> bitmap_shift;         // n / bitmap_wordlength
-  int position = n & bitmap_mask;       // n % bitmap_wordlength
-  return (b->array[word] >> position) & 1;
+    int word = n >> bitmap_shift;         // n / bitmap_wordlength
+    int position = n & bitmap_mask;       // n % bitmap_wordlength
+    return (b->array[word] >> position) & 1;
 }
 
 bitmap * bitmap_allocate(int bits)
 {
-  // error-checking should be better :-)
-  bitmap *b = malloc(sizeof(bitmap));
-  b->bits = bits;
-  b->words = (bits + bitmap_wordlength - 1) / bitmap_wordlength;
+    // error-checking should be better :-)
+    bitmap *b = malloc(sizeof(bitmap));
+    b->bits = bits;
+    b->words = (bits + bitmap_wordlength - 1) / bitmap_wordlength;
     // divide, but round up for the ceiling
-  b->array = calloc(b->words, sizeof(bitmap_type));
-  return b;
+    b->array = calloc(b->words, sizeof(bitmap_type));
+    return b;
 }
 
 void bitmap_deallocate(bitmap *b)
 {
-  // error-checking should be better :-)
-  free(b->array);
-  free(b);
+    // error-checking should be better :-)
+    free(b->array);
+    free(b);
 }
 
 void bitmap_print(bitmap *b)
 {
-  for (int i = 0; i < b->words; i++)
-    { printf(" " bitmap_fmt, b->array[i]); }
-  printf("\n");
+    for (int i = 0; i < b->words; i++)
+    {
+        printf(" " bitmap_fmt, b->array[i]);
+    }
+    printf("\n");
 }

@@ -7,13 +7,15 @@
 #include "tables.h"
 
 // implementations
-RC valueEquals (Value *left, Value *right, Value *result) {
+RC valueEquals (Value *left, Value *right, Value *result)
+{
     if(left->dt != right->dt)
         THROW(RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE, "equality comparison only supported for values of the same datatype");
 
     result->dt = DT_BOOL;
 
-    switch(left->dt) {
+    switch(left->dt)
+    {
     case DT_INT:
         result->v.boolV = (left->v.intV == right->v.intV);
         break;
@@ -31,13 +33,15 @@ RC valueEquals (Value *left, Value *right, Value *result) {
     return RC_OK;
 }
 
-RC valueSmaller (Value *left, Value *right, Value *result) {
+RC valueSmaller (Value *left, Value *right, Value *result)
+{
     if(left->dt != right->dt)
         THROW(RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE, "equality comparison only supported for values of the same datatype");
 
     result->dt = DT_BOOL;
 
-    switch(left->dt) {
+    switch(left->dt)
+    {
     case DT_INT:
         result->v.boolV = (left->v.intV < right->v.intV);
         break;
@@ -54,7 +58,8 @@ RC valueSmaller (Value *left, Value *right, Value *result) {
     return RC_OK;
 }
 
-RC boolNot (Value *input, Value *result) {
+RC boolNot (Value *input, Value *result)
+{
     if (input->dt != DT_BOOL)
         THROW(RC_RM_BOOLEAN_EXPR_ARG_IS_NOT_BOOLEAN, "boolean NOT requires boolean input");
     result->dt = DT_BOOL;
@@ -63,7 +68,8 @@ RC boolNot (Value *input, Value *result) {
     return RC_OK;
 }
 
-RC boolAnd (Value *left, Value *right, Value *result) {
+RC boolAnd (Value *left, Value *right, Value *result)
+{
     if (left->dt != DT_BOOL || right->dt != DT_BOOL)
         THROW(RC_RM_BOOLEAN_EXPR_ARG_IS_NOT_BOOLEAN, "boolean AND requires boolean inputs");
     result->v.boolV = (left->v.boolV && right->v.boolV);
@@ -71,7 +77,8 @@ RC boolAnd (Value *left, Value *right, Value *result) {
     return RC_OK;
 }
 
-RC boolOr (Value *left, Value *right, Value *result) {
+RC boolOr (Value *left, Value *right, Value *result)
+{
     if (left->dt != DT_BOOL || right->dt != DT_BOOL)
         THROW(RC_RM_BOOLEAN_EXPR_ARG_IS_NOT_BOOLEAN, "boolean OR requires boolean inputs");
     result->v.boolV = (left->v.boolV || right->v.boolV);
@@ -79,13 +86,16 @@ RC boolOr (Value *left, Value *right, Value *result) {
     return RC_OK;
 }
 
-RC evalExpr (Record *record, Schema *schema, Expr *expr, Value **result) {
+RC evalExpr (Record *record, Schema *schema, Expr *expr, Value **result)
+{
     Value *lIn;
     Value *rIn;
     MAKE_VALUE(*result, DT_INT, -1);
 
-    switch(expr->type) {
-    case EXPR_OP: {
+    switch(expr->type)
+    {
+    case EXPR_OP:
+    {
         Operator *op = expr->expr.op;
         bool twoArgs = (op->type != OP_BOOL_NOT);
         //      lIn = (Value *) malloc(sizeof(Value));
@@ -95,7 +105,8 @@ RC evalExpr (Record *record, Schema *schema, Expr *expr, Value **result) {
         if (twoArgs)
             CHECK(evalExpr(record, schema, op->args[1], &rIn));
 
-        switch(op->type) {
+        switch(op->type)
+        {
         case OP_BOOL_NOT:
             CHECK(boolNot(lIn, *result));
             break;
@@ -133,11 +144,15 @@ RC evalExpr (Record *record, Schema *schema, Expr *expr, Value **result) {
     return RC_OK;
 }
 
-RC freeExpr (Expr *expr) {
-    switch(expr->type) {
-    case EXPR_OP: {
+RC freeExpr (Expr *expr)
+{
+    switch(expr->type)
+    {
+    case EXPR_OP:
+    {
         Operator *op = expr->expr.op;
-        switch(op->type) {
+        switch(op->type)
+        {
         case OP_BOOL_NOT:
             freeExpr(op->args[0]);
             break;
@@ -160,7 +175,8 @@ RC freeExpr (Expr *expr) {
     return RC_OK;
 }
 
-void freeVal (Value *val) {
+void freeVal (Value *val)
+{
     if (val->dt == DT_STRING)
         free(val->v.stringV);
     free(val);
