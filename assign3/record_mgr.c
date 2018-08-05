@@ -1312,6 +1312,6 @@ static char* getIthAttrName(char *pfHdrFrame, int ithSlot)
     }
     nameLength = getIthNameLength(pfHdrFrame, ithSlot);
     VALID_CALLOC(char, attrName, 1, nameLength+1); //room for null char
-    memcpy(&attrName, ptr, nameLength);
+    memcpy(attrName, ptr, nameLength);
     return attrName;
 }
