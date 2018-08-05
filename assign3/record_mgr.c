@@ -535,7 +535,7 @@ RC next (RM_ScanHandle *scan, Record *record){
     //Only need to do once
     ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
     char* pfhr = pageFileHeader.data;
-    VALID_CALLOC(Value, result, 1, sizeof(Value)); //Allocate mem for result in evalExpr
+    Value * result;
     //Iterate through the pages on disk and pin to bufferpool and search over bitmap of that page
     int recordSize = getRecordSize(scan->rel->schema);
     for(; scan->pageNum<numPages; scan->pageNum++){
@@ -545,22 +545,24 @@ RC next (RM_ScanHandle *scan, Record *record){
       //TODO: have address of bitmap be pointed by a variable (lets call it bitmap just for use in while loop)
       bitmap * b = getBitMapPH(phr);
       //while we did not reach the end of the slot
-      while(scan->slotNum <= getNumSlotsPerPage(pfhr)){
+      while(scan->slotNum < getNumSlotsPerPage(pfhr)){
         //utilize bitmap_read(bitmap, int n) to retrieve bit
         //if bit = 1, then store the data (record) at that position in the page into record->id.slot
         if(bitmap_read(b,scan->slotNum)==1)
         {
-          char * slotPtr = phr;
-          slotPtr+= 2*pageNumOffset + 2* sizeof(int);
-          slotPtr+= bitmapOffset(getBitMapWordsPH(phr)); // add the bitMap size offset
-          slotPtr+= (scan->slotNum * recordSize );
+          RID rid;
+          rid.page = scan->pageNum;
+          rid.slot = scan->slotNum;
+          ASSERT_RC_OK(getRecord(scan->rel,rid,record));
           ASSERT_RC_OK(evalExpr(record, scan->rel->schema, scan->mgmtData, &result));
+
           if(result->v.boolV || scan->mgmtData == NULL){
             //if the condition matches, then update the scanHandle so that now has the tuple in it
-            memcpy(record->data, slotPtr, getRecordSize(scan->rel->schema));
+            //memcpy(record->data, slotPtr, getRecordSize(scan->rel->schema));
             record->id.page = scan->pageNum;
             record->id.slot = scan->slotNum;
             free(result);
+            scan->slotNum++;
             return RC_OK;
           }
         }
@@ -746,6 +748,8 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 		case DT_STRING: {
 		    attr_val->v.stringV =(char *) calloc(schema->typeLength[attrNum]+1, sizeof(char));
 			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
+			//memcpy(attr_val->v.stringV[schema->typeLength[attrNum]], '\0',1);
+			//attr_val->v.stringV[schema->typeLength[attrNum]]='\0';
 			break;
 		}
 		case DT_FLOAT: {
@@ -784,6 +788,7 @@ RC setAttr (Record *record, Schema *schema, int attrNum, Value *value){
 		}
 		case DT_STRING: {
 			memcpy(attr_offset, value->v.stringV, schema->typeLength[attrNum]);
+			attr_offset[schema->typeLength[attrNum]]='\0';
 			break;
 		}
 		case DT_FLOAT: {

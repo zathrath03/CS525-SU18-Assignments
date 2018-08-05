@@ -38,7 +38,7 @@ typedef struct RM_ScanHandle {
     RM_TableData *rel;
     unsigned int pageNum;
     unsigned short slotNum;
-    void *mgmtData;
+    Expr *mgmtData;
 } RM_ScanHandle;
 
 // table and manager
