@@ -744,7 +744,7 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value){
 			break;
 		}
 		case DT_STRING: {
-		    attr_val->v.stringV =(char *) calloc(sizeof(char), schema->typeLength[attrNum]);
+		    attr_val->v.stringV =(char *) calloc(schema->typeLength[attrNum]+1, sizeof(char));
 			memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
 			break;
 		}
