@@ -772,31 +772,18 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
     switch(schema->dataTypes[attrNum])
     {
     case DT_INT:
-    {
         memcpy(&(attr_val->v.intV), attr_offset, schema->typeLength[attrNum]);
-        //attr_val->v.intV = *(int *)attr_offset;
         break;
-    }
     case DT_STRING:
-    {
         attr_val->v.stringV =(char *) calloc(schema->typeLength[attrNum]+1, sizeof(char));
         memcpy(attr_val->v.stringV, attr_offset, schema->typeLength[attrNum]);
-        //memcpy(attr_val->v.stringV[schema->typeLength[attrNum]], '\0',1);
-        //attr_val->v.stringV[schema->typeLength[attrNum]]='\0';
         break;
-    }
     case DT_FLOAT:
-    {
         memcpy(&(attr_val->v.floatV), attr_offset, schema->typeLength[attrNum]);
-        //attr_val->v.floatV = *(float *)attr_offset;
         break;
-    }
     case DT_BOOL:
-    {
         memcpy(&(attr_val->v.boolV), attr_offset, schema->typeLength[attrNum]);
-        //attr_val->v.boolV = *(bool *)attr_offset;
         break;
-    }
     }
 
     *value = attr_val;
@@ -821,25 +808,21 @@ RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
     case DT_INT:
     {
         memcpy(attr_offset, &(value->v.intV), schema->typeLength[attrNum]);
-        //*(int *)attr_offset = attr_val->v.intV;
         break;
     }
     case DT_STRING:
     {
         memcpy(attr_offset, value->v.stringV, schema->typeLength[attrNum]);
-        attr_offset[schema->typeLength[attrNum]]='\0';
         break;
     }
     case DT_FLOAT:
     {
         memcpy(attr_offset, &(value->v.floatV), schema->typeLength[attrNum]);
-        //*(float *)attr_offset = attr_val->v.floatV;
         break;
     }
     case DT_BOOL:
     {
         memcpy(attr_offset, &(value->v.boolV), schema->typeLength[attrNum]);
-        //*(bool *)attr_offset = attr_val->v.boolV;
         break;
     }
     }
