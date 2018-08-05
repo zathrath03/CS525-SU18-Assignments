@@ -548,9 +548,8 @@ RC next (RM_ScanHandle *scan, Record *record)
     //Only need to do once
     ASSERT_RC_OK(pinPage(bm,&pageFileHeader,0));
     char* pfhr = pageFileHeader.data;
-    Value * result;
+    Value *result;
     //Iterate through the pages on disk and pin to bufferpool and search over bitmap of that page
-    int recordSize = getRecordSize(scan->rel->schema);
     for(; scan->pageNum<numPages; scan->pageNum++)
     {
         ASSERT_RC_OK(pinPage(bm,&curPage,scan->pageNum));
@@ -575,7 +574,7 @@ RC next (RM_ScanHandle *scan, Record *record)
                     //return record
                     record->id.page = scan->pageNum;
                     record->id.slot = scan->slotNum;
-                    free(result);
+                    freeVal(result);
                     bitmap_deallocate(b);
                     ++scan->slotNum;
                     return RC_OK;
@@ -584,7 +583,7 @@ RC next (RM_ScanHandle *scan, Record *record)
         }
         bitmap_deallocate(b);
     }
-    free(result);
+    freeVal(result);
     return RC_RM_NO_MORE_TUPLES;
 }
 
