@@ -632,54 +632,31 @@ Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
 {
     //Allocate memory for all arrays in schema struct
     VALID_CALLOC(Schema, schema, 1, sizeof(Schema));
-    VALID_CALLOC(char*, schAttrNames, numAttr, sizeof(char*));
-    VALID_CALLOC(DataType, schDataTypes, numAttr, sizeof(DataType));
-    VALID_CALLOC(int, schTypeLength, numAttr, sizeof(int));
-    VALID_CALLOC(int, schKeyAttrs, keySize, sizeof(int));
 
-
-    //initializing arrays with the parameters passed to the function
-    for(int i = 0; i < numAttr; i++)
-    {
-        //dataTypes and keys is a straight-forward copy values from input
-        schDataTypes[i] = dataTypes[i];
-        schKeyAttrs[i] = keys[i];
-        //typeLength only includes a length for the strings, 0 otherwise
-        switch (dataTypes[i])
-        {
+    //typeLength only includes the length of string dataTypes
+    //update typeLength with length of other dataTypes
+    for(int i = 0; i < numAttr; i++){
+        switch (dataTypes[i]){
         case DT_INT:
-            schTypeLength[i] = sizeof(int);
+            typeLength[i] = sizeof(int);
             break;
         case DT_FLOAT:
-            schTypeLength[i] = sizeof(float);
+            typeLength[i] = sizeof(float);
             break;
         case DT_BOOL:
-            schTypeLength[i] = sizeof(bool);
-            break;
-        default:
-            schTypeLength[i] = typeLength[i];
+            typeLength[i] = sizeof(bool);
             break;
         }
-        //NOTE: typeLength does not include the null terminator for strings
-        schAttrNames[i] = (char*) calloc(1, strlen(attrNames[i]));
-        if(!schAttrNames[i])
-        {
-            \
-            printError(RC_BM_MEMORY_ALOC_FAIL);
-            \
-            exit(-1);
-            \
-        }
-        strncpy(schAttrNames[i], attrNames[i], strlen(attrNames[i]));
     }
     //Store non-array inputs
     schema->numAttr = numAttr;
     schema->keySize = keySize;
-    //Store allocated arrays in schema struct
-    schema->attrNames = schAttrNames;
-    schema->dataTypes = schDataTypes;
-    schema->typeLength = schTypeLength;
-    schema->keyAttrs = schKeyAttrs;
+    //Store array inputs in schema struct
+    schema->attrNames = attrNames;
+    schema->dataTypes = dataTypes;
+    schema->typeLength = typeLength;
+    schema->keyAttrs = keys;
+
     return schema;
 }
 /*********************************************************************
