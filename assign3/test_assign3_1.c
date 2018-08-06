@@ -21,8 +21,8 @@
 		lSer = serializeValue(lVal); \
 		rSer = serializeValue(rVal); \
         ASSERT_EQUALS_STRING(lSer, rSer, "attr same");	\
-		free(lVal); \
-		free(rVal); \
+		freeVal(lVal); \
+		freeVal(rVal); \
 		free(lSer); \
 		free(rSer); \
       }									\
@@ -375,7 +375,9 @@ void testInsertManyRecords(void) {
     for(i = 0; i < numInserts; i++) {
         RID rid = rids[i];
         TEST_CHECK(getRecord(table, rid, r));
-        ASSERT_EQUALS_RECORDS(fromTestRecord(schema, realInserts[i]), r, schema, "compare records");
+        Record * testRecord = fromTestRecord(schema, realInserts[i]);
+        ASSERT_EQUALS_RECORDS(testRecord, r, schema, "compare records");
+        TEST_CHECK(freeRecord(testRecord));
     }
 
     r = fromTestRecord(schema, updates[0]);
