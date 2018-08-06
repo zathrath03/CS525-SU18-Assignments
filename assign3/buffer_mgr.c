@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <io.h>
+#include <unistd.h>
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
 #include "replace_strat.h"

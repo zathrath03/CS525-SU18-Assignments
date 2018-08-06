@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
-#include <io.h>
+#include <unistd.h>
 
 #include "bitmap.h"
 #include "record_mgr.h"
@@ -646,6 +646,8 @@ Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
         case DT_BOOL:
             typeLength[i] = sizeof(bool);
             break;
+        default:
+            break;
         }
     }
     //Store non-array inputs
@@ -1265,7 +1267,7 @@ static unsigned short getIthKeyAttr(char *pfHdrFrame, int ithSlot)
 }
 static unsigned short getIthNameLength(char *pfHdrFrame, int ithSlot)
 {
-    unsigned short nameLength;
+    unsigned short nameLength = 0;
     unsigned short numAttr = getNumAttr(pfHdrFrame);
     unsigned short keySize = getKeySize(pfHdrFrame);
     char *ptr = pfHdrFrame + attrNamesOffset;
