@@ -22,3 +22,13 @@
 
 I also helped with scan functions as well, I set up the underlying page headers bitmap that is used for records handling.  
 I helped with testing and debugging other functions as well.
+
+
+## Russi Sinha:
+// dealing with records and attribute values
+
+* extern RC createRecord (Record **record, Schema *schema);
+* extern RC freeRecord (Record *record);
+* extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value);
+* extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value);
+
